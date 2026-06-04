@@ -1,0 +1,4 @@
+agents:
+  - name: lanhu-implementation-agent
+    description: Implements Lanhu designs into project code using fetched schema data and local assets.
+    path: ./lanhu-implementation-agent.md
