@@ -4,7 +4,11 @@ This plugin packages a Lanhu design-to-code workflow for Codex.
 
 It provides:
 
-- a `lanhu-restore-design` skill for schema-first Lanhu implementation
+- `lanhu-use` for authentication, script safety, URL parsing, and error recovery
+- `lanhu-fetch-design` for listing designs and fetching schema, preview, tokens, and assets
+- `lanhu-generate-baseline` for creating a schema-first static HTML parity baseline
+- `lanhu-verify-parity` for final visual and implementation checks
+- `lanhu-restore-design` for end-to-end schema-first Lanhu implementation
 - a `/restore-from-lanhu` command prompt
 - `scripts/fetch_lanhu.py` for listing designs, fetching schema JSON, extracting design tokens, downloading preview images, and localizing image assets
 - `scripts/restore_lanhu.py` for generating a schema-first static HTML parity baseline

@@ -1,11 +1,22 @@
 ---
 name: lanhu-restore-design
-description: Restore Lanhu designs into target project code. Use when the user provides a Lanhu URL, asks to fetch Lanhu schema/assets, or wants a Lanhu design implemented with high visual fidelity.
+description: "Restore Lanhu designs into target project code with high visual fidelity. Use when the user provides a Lanhu URL and wants a screen/page/component implemented in React, Next.js, Vue, Nuxt, Flutter, Android, iOS, or standalone HTML. This is the high-level orchestration skill; load lanhu-use, lanhu-fetch-design, lanhu-generate-baseline, and lanhu-verify-parity as needed."
 ---
 
 # Lanhu Design Restoration
 
-This skill turns a Lanhu design into maintainable project code by fetching structured design data, localizing assets, implementing from schema values, and checking parity.
+This skill orchestrates end-to-end Lanhu design restoration. It turns a Lanhu design into maintainable project code by fetching structured design data, localizing assets, generating a static parity baseline, implementing from schema values, and verifying parity.
+
+Use the smaller Lanhu skills for focused phases:
+
+- `lanhu-use`: authentication, script safety, URL parsing, and error recovery.
+- `lanhu-fetch-design`: list/fetch designs and produce local schema, tokens, preview, and assets.
+- `lanhu-generate-baseline`: create the static HTML parity checkpoint.
+- `lanhu-verify-parity`: validate baseline and final implementation.
+
+## Core Rule
+
+Restore from real artifacts, not from memory. Use `.schema.json` as the source of truth, preview PNG for visible-frame confirmation, and project conventions for production code structure.
 
 ## Prerequisites
 
@@ -14,33 +25,7 @@ This skill turns a Lanhu design into maintainable project code by fetching struc
 - Playwright Chromium installed with `python -m playwright install chromium`
 - Lanhu authentication saved locally by `scripts/lanhu_auth.py login`
 
-Treat the Lanhu cookie as a secret. Do not print it, commit it, or copy it into generated source code.
-
-Do not ask the user to configure `LANHU_COOKIE`. Use the local login helper:
-
-```bash
-python <plugin-root>/scripts/lanhu_auth.py login --url "$LANHU_URL"
-```
-
-The helper opens an interactive browser window, lets the user complete Lanhu or team SSO login, captures Lanhu cookies, and encrypts them locally with Windows DPAPI. `fetch_lanhu.py` decrypts that cookie store automatically on later runs.
-
-Reuse the saved encrypted cookie store by default. Do not rerun login unless the cookie store is missing, expired, cleared, or Lanhu returns an auth/permission error for the requested team/project.
-
-If login status is unclear:
-
-```bash
-python <plugin-root>/scripts/lanhu_auth.py status
-```
-
-If the saved cookies are expired or belong to the wrong team:
-
-```bash
-python <plugin-root>/scripts/lanhu_auth.py clear
-python <plugin-root>/scripts/lanhu_auth.py login --url "$LANHU_URL"
-```
-
-For endpoint details, see `references/lanhu-api.md`.
-For code restoration precision rules, see `references/codegen-precision.md`.
+For authentication and endpoint rules, load `lanhu-use`. For code restoration precision rules, read `references/codegen-precision.md` when implementing.
 
 ## Locate The Plugin Root
 
@@ -52,42 +37,24 @@ python <plugin-root>/scripts/fetch_lanhu.py
 
 If unsure where the plugin root is, use the directory that contains this skill's parent `skills/` folder.
 
-## Step 1: List Designs
+## Required Workflow
 
-If the user did not provide a design index/name and the URL does not include a design id, list available designs:
+Follow these steps in order. Do not write production UI code before local design artifacts and the baseline exist.
 
-```bash
-python <plugin-root>/scripts/fetch_lanhu.py --url "$LANHU_URL"
-```
+### Step 1: Fetch Design Artifacts
 
-Show the compact JSON list to the user and ask which `index` or exact `name` to restore.
+Use `lanhu-fetch-design`.
 
-If the URL contains `image_id`, skip user selection and fetch that design directly.
-
-## Step 2: Fetch Design Data
-
-Fetch the selected design:
-
-```bash
-python <plugin-root>/scripts/fetch_lanhu.py \
-  --url "$LANHU_URL" \
-  --design "$DESIGN_TARGET" \
-  --download-images \
-  --output-dir "$OUTPUT_DIR"
-```
-
-Only add `--download-code` when the user explicitly requests official Lanhu generated HTML/CSS. Official code is slow to generate and is reference-only.
-
-Expected outputs:
+Expected artifacts:
 
 - `<name>.schema.json`: authoritative layer tree and styles
 - `<name>.tokens.txt`: supplemental high-risk visual attributes
 - `<name>.png`: full design preview for visible-frame checking
 - `assets/slices/img_N.*`: localized image assets
 - `<name>.image_mapping.json`: local path to remote URL mapping
-- `<name>.official.html` and `<name>.official.css`: optional reference-only files when `--download-code` is used
+- optional `<name>.official.html` and `<name>.official.css`: reference-only official generated code
 
-## Step 3: Inspect The Target Project
+### Step 2: Inspect The Target Project
 
 Before writing code, inspect the user's repository:
 
@@ -102,7 +69,26 @@ Also detect the style system: CSS Modules, scoped Vue styles, SCSS, Tailwind, St
 
 If a root `DESIGN.md` or equivalent design-system document exists, read it before generating code. Use it for tokens, themes, reusable components, naming, accessibility, directory layout, and style conventions. Concrete layer values still come from `.schema.json`; if there is an unavoidable conflict, preserve visual parity and report the tradeoff.
 
-## Step 4: Implement From Schema
+### Step 3: Generate Static Baseline
+
+Use `lanhu-generate-baseline`.
+
+Create `restore/index.html` and `restore/parity-report.json` before framework translation. Use the generated baseline as the first fidelity checkpoint.
+
+### Step 4: Plan The Implementation
+
+Before editing app code, identify:
+
+- target route/component/file
+- framework and styling convention
+- required local assets
+- visible sections in the preview PNG
+- repeated or semantic components worth extracting
+- project design-system rules that must be respected
+
+Prefer a page-level component first. Extract child components only when they are repeated, have a clear business boundary, or map to obvious reusable UI modules such as cards, list items, navigation, forms, dialogs, and tabs.
+
+### Step 5: Implement From Schema
 
 Authority order:
 
@@ -113,16 +99,6 @@ schema.json > optional official HTML/CSS > tokens.txt > preview PNG
 Use `.schema.json` as the source of truth for all dimensions, coordinates, colors, typography, spacing, border radius, shadows, gradients, opacity, and layout values.
 
 Use the preview `.png` to determine what is visible in the current frame. Skip hidden layers, alternate interaction states, covered screens, and invisible overlays unless the user explicitly asks for those states.
-
-Before translating into a framework, generate a static parity baseline:
-
-```bash
-python <plugin-root>/scripts/restore_lanhu.py \
-  --input-dir "$OUTPUT_DIR" \
-  --output-dir "$OUTPUT_DIR/restore"
-```
-
-Use the generated `restore/index.html` and `restore/parity-report.json` as the first fidelity checkpoint. The baseline flattens visible layers with absolute `rowDims` and localizes image references, which reduces layout drift before React/Vue/Flutter translation.
 
 Suggested HTML mapping:
 
@@ -145,19 +121,33 @@ Do not use Lanhu CDN URLs in generated app code. Reference local assets from `as
 - Preserve `flexGap` as `gap` or the target platform equivalent.
 - For fixed-size flex-centered containers, ignore schema padding when that padding would shrink centered content under `box-sizing: border-box`; use flex centering as the alignment source.
 
-## Component Strategy
+## Implementation Strategy
 
-Start with a page-level component. Extract child components only when they are repeated, have a clear business boundary, or map to obvious reusable UI modules such as cards, list items, navigation, forms, dialogs, and tabs.
+- Match the repository's existing component and style patterns before introducing new ones.
+- Keep generated code maintainable: semantic class names, readable component boundaries, no raw Lanhu layer names such as `group_4` unless no better semantic name exists.
+- Use local helper components and design tokens when they preserve parity.
+- Avoid adding abstractions for one-off decorative shapes, separators, simple icon wrappers, or tiny structures with fewer than three meaningful elements.
+- Keep assets close to the target app's existing asset convention.
 
-Avoid extracting one-off decorative shapes, separators, simple icon wrappers, or tiny structures with fewer than three meaningful elements.
+## Incremental Workflow
 
-## Step 5: Use Tokens As A Gap Check
+Borrow Figma's incremental pattern: inspect, create a stable wrapper/page, implement one section at a time, validate, then continue. For larger screens:
+
+1. Implement the page shell and asset wiring.
+2. Implement one visible section.
+3. Render or run a targeted check.
+4. Fix issues before moving to the next section.
+5. Run final parity checks after all sections are complete.
+
+Do not build on a broken baseline or a section with known visual drift.
+
+## Use Tokens As A Gap Check
 
 Read `<name>.tokens.txt` after implementation. Only use it when the schema-derived implementation appears to be missing a complex visual property. Never overwrite a schema value with a token summary.
 
-## Step 6: Verify Parity
+## Verify Parity
 
-Before finishing, compare generated code against the schema and preview image:
+Use `lanhu-verify-parity` before finishing. At minimum, compare generated code against the schema and preview image:
 
 - fixed dimensions remain fixed where required
 - clipping and overflow match
@@ -173,3 +163,13 @@ Before finishing, compare generated code against the schema and preview image:
 - `DESIGN.md` conventions were followed when present
 
 Fix implementation errors immediately. In the final response, summarize what was implemented, what verification ran, and any intentional platform adaptations.
+
+## Error Recovery
+
+On any failed fetch, baseline generation, app build, or parity check:
+
+1. Stop and read the actual error.
+2. Determine whether the failing phase is auth, fetch, baseline, implementation, or verification.
+3. Use the relevant smaller Lanhu skill rather than retrying the entire workflow.
+4. Preserve user code changes and make the smallest targeted fix.
+5. Re-run the failed check before reporting completion.
