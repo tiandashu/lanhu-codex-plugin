@@ -1,75 +1,42 @@
-# Lanhu Codex Plugin
+# Lanhu Codex Plugin Marketplace
 
-This plugin packages a Lanhu design-to-code workflow for Codex.
+This repository is a Codex plugin marketplace for the Lanhu design-to-code plugin.
 
-It provides:
+## Install In Codex
 
-- a `lanhu-restore-design` skill for schema-first Lanhu implementation
-- a `/restore-from-lanhu` command prompt
-- `scripts/fetch_lanhu.py` for listing designs, fetching schema JSON, extracting design tokens, downloading preview images, and localizing image assets
-- `scripts/restore_lanhu.py` for generating a schema-first static HTML parity baseline
-- API notes in `skills/lanhu-restore-design/references/lanhu-api.md`
-
-## Setup
-
-Install the Python dependencies:
+Add this marketplace:
 
 ```bash
-pip install -r requirements.txt
-python -m playwright install chromium
+codex plugin marketplace add tiandashu/lanhu-codex-plugin
 ```
 
-## Login
+Then restart Codex, open Plugins, choose the `Lanhu Codex Plugins` marketplace, and install `Lanhu`.
 
-Authenticate through an interactive browser. The helper opens Lanhu, lets you complete Lanhu or team SSO login, then encrypts cookies locally with Windows DPAPI:
+## Sparse Checkout Note
+
+Do not use a leading slash in sparse checkout paths.
+
+Incorrect:
 
 ```bash
-python scripts/lanhu_auth.py login --url "https://lanhuapp.com/web/#/item/project/stage?tid=...&pid=..."
+codex plugin marketplace add tiandashu/lanhu-codex-plugin --sparse /
 ```
 
-Check or clear the saved login:
+This can fail with:
+
+```text
+git sparse-checkout set / failed with status exit code: 128
+fatal: specify directories rather than patterns (no leading slash)
+```
+
+Use the normal marketplace command above. If sparse checkout is required, pass directory paths without a leading slash and include both the marketplace metadata and plugin folder:
 
 ```bash
-python scripts/lanhu_auth.py status
-python scripts/lanhu_auth.py clear
+codex plugin marketplace add tiandashu/lanhu-codex-plugin --sparse .agents/plugins --sparse plugins/lanhu
 ```
 
-`fetch_lanhu.py` reads the encrypted cookie store by default. `--cookie` is still available for debugging, but environment-variable authentication is no longer the recommended flow.
+## Repository Layout
 
-The encrypted cookie store is reused across runs. Log in again only when the saved cookies expire, are cleared, or no longer have access to the target Lanhu team/project.
-
-## Quick Commands
-
-List designs in a Lanhu project:
-
-```bash
-python scripts/fetch_lanhu.py --url "https://lanhuapp.com/web/#/item/project/stage?tid=...&pid=..."
-```
-
-Fetch one design and its local assets:
-
-```bash
-python scripts/fetch_lanhu.py \
-  --url "https://lanhuapp.com/web/#/item/project/stage?tid=...&pid=..." \
-  --design 1 \
-  --download-images \
-  --output-dir ./lanhu_output
-```
-
-Single design URLs containing `image_id` are supported directly. The script uses `project/multi_info` to find the latest design version before fetching DDS schema data.
-
-Generate a high-fidelity static HTML baseline:
-
-```bash
-python scripts/restore_lanhu.py --input-dir ./lanhu_output --output-dir ./lanhu_output/restore
-```
-
-Preview it from the fetch output root so local assets resolve:
-
-```bash
-python -m http.server 8766 --bind 127.0.0.1 --directory ./lanhu_output
-```
-
-Then open `http://127.0.0.1:8766/restore/index.html`.
-
-The generated `.schema.json` is the source of truth for implementation. The preview `.png` is used to confirm visible layers, and `.tokens.txt` is only a supplemental check for complex visual attributes.
+- `.agents/plugins/marketplace.json`: marketplace catalog
+- `plugins/lanhu/`: plugin package
+- `plugins/lanhu/.codex-plugin/plugin.json`: plugin manifest

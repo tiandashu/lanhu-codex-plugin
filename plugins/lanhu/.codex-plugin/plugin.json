@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "description": "Lanhu design-to-code workflows for fetching design schema, localizing assets, and restoring screens into project code.",
   "author": {
-    "name": "Local Codex Plugin",
-    "url": "https://lanhuapp.com"
+    "name": "tiandashu",
+    "url": "https://github.com/tiandashu"
   },
   "homepage": "https://lanhuapp.com",
-  "repository": "https://github.com/tiandashu/design-lanhu-skill",
+  "repository": "https://github.com/tiandashu/lanhu-codex-plugin",
   "license": "MIT",
   "keywords": [
     "lanhu",
@@ -21,7 +21,7 @@
     "displayName": "Lanhu",
     "shortDescription": "Restore Lanhu designs into production UI code",
     "longDescription": "Fetches Lanhu schema data, design tokens, preview images, and local image assets, then guides Codex through schema-first UI implementation with parity checks.",
-    "developerName": "Local Codex Plugin",
+    "developerName": "tiandashu",
     "category": "Design",
     "capabilities": [
       "Interactive",

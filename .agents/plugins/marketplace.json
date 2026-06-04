@@ -1,0 +1,20 @@
+{
+  "name": "lanhu-codex-plugin",
+  "interface": {
+    "displayName": "Lanhu Codex Plugins"
+  },
+  "plugins": [
+    {
+      "name": "lanhu",
+      "source": {
+        "source": "local",
+        "path": "./plugins/lanhu"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Design"
+    }
+  ]
+}
