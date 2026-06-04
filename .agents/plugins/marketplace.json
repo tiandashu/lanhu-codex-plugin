@@ -1,7 +1,7 @@
 {
-  "name": "lanhu-codex-plugin",
+  "name": "vtian",
   "interface": {
-    "displayName": "Lanhu Codex Plugins"
+    "displayName": "vtian"
   },
   "plugins": [
     {
