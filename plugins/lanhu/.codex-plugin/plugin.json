@@ -6,7 +6,7 @@
     "name": "tiandashu",
     "url": "https://github.com/tiandashu"
   },
-  "homepage": "https://lanhuapp.com",
+  "homepage": "https://github.com/tiandashu/lanhu-codex-plugin",
   "repository": "https://github.com/tiandashu/lanhu-codex-plugin",
   "license": "MIT",
   "keywords": [
@@ -23,7 +23,7 @@
   "interface": {
     "displayName": "Lanhu",
     "shortDescription": "Restore Lanhu designs into production UI code",
-    "longDescription": "Fetches Lanhu schema data, design tokens, preview images, and local image assets, inspects local design-system components and variables, then guides Codex through schema-first UI implementation with visual and interaction parity checks.",
+    "longDescription": "Current version: 0.1.1. Fetches Lanhu schema data, design tokens, preview images, and local image assets, inspects local design-system components and variables, then guides Codex through schema-first UI implementation with visual and interaction parity checks.",
     "developerName": "tiandashu",
     "category": "Design",
     "capabilities": [
@@ -31,7 +31,7 @@
       "Read",
       "Write"
     ],
-    "websiteURL": "https://lanhuapp.com",
+    "websiteURL": "https://github.com/tiandashu/lanhu-codex-plugin",
     "privacyPolicyURL": "https://lanhuapp.com/privacy",
     "termsOfServiceURL": "https://lanhuapp.com/terms",
     "defaultPrompt": [
