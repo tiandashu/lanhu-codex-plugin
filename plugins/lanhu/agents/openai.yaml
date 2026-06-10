@@ -2,3 +2,6 @@ agents:
   - name: lanhu-implementation-agent
     description: Implements Lanhu designs into project code using fetched schema data and local assets.
     path: ./lanhu-implementation-agent.md
+  - name: lanhu-design-parity-review-agent
+    description: Reviews restored Lanhu UI against schema, preview images, baseline reports, and real interactions.
+    path: ./lanhu-design-parity-review-agent.md

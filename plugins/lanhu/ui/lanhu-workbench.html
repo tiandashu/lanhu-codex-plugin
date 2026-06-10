@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lanhu Workbench</title>
+  <style>
+    :root {
+      --paper: #f7f8fb;
+      --ink: #162033;
+      --muted: #667085;
+      --line: #d8dee8;
+      --panel: #ffffff;
+      --blue: #1677ff;
+      --green: #0e9f6e;
+      --amber: #b7791f;
+      --red: #c2410c;
+      --violet: #6d5dfc;
+      --shadow: 0 14px 36px rgba(22, 32, 51, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(22, 119, 255, 0.06) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(14, 159, 110, 0.05) 1px, transparent 1px),
+        var(--paper);
+      background-size: 28px 28px;
+    }
+    .shell {
+      width: min(1120px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 22px 0;
+    }
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 8px 0 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+    .lede {
+      margin: 6px 0 0;
+      max-width: 700px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid rgba(22, 119, 255, 0.28);
+      border-radius: 8px;
+      background: #eef5ff;
+      color: #0f5ec2;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(310px, 0.8fr);
+      gap: 16px;
+      padding-top: 16px;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    h2 {
+      margin: 0;
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 9px;
+      border-radius: 999px;
+      background: #f2f4f7;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .steps {
+      display: grid;
+      gap: 0;
+    }
+    .step {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) 92px;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      align-items: start;
+    }
+    .step:last-child { border-bottom: 0; }
+    .num {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: #e8f1ff;
+      color: var(--blue);
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .step strong {
+      display: block;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .step p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .badge {
+      justify-self: end;
+      min-width: 72px;
+      padding: 5px 8px;
+      border-radius: 7px;
+      text-align: center;
+      font-size: 12px;
+      background: #f2f4f7;
+      color: var(--muted);
+    }
+    .badge.good { background: #e9f8f1; color: var(--green); }
+    .badge.warn { background: #fff7e6; color: var(--amber); }
+    .badge.todo { background: #fff1eb; color: var(--red); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      padding: 14px 16px 16px;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcff;
+    }
+    .metric b {
+      display: block;
+      font-size: 22px;
+      line-height: 1;
+    }
+    .metric span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th,
+    td {
+      padding: 10px 12px;
+      border-top: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      background: #fbfcff;
+    }
+    code {
+      font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: 11px;
+      color: #344054;
+    }
+    .notes {
+      padding: 14px 16px 16px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .rule {
+      display: flex;
+      gap: 10px;
+      padding: 10px 0;
+      border-top: 1px solid var(--line);
+    }
+    .rule:first-child { border-top: 0; padding-top: 0; }
+    .rule mark {
+      flex: 0 0 auto;
+      width: 6px;
+      border-radius: 999px;
+      background: var(--violet);
+    }
+    @media (max-width: 860px) {
+      header { align-items: flex-start; flex-direction: column; }
+      main { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
+      .step { grid-template-columns: 30px minmax(0, 1fr); }
+      .badge { grid-column: 2; justify-self: start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div>
+        <h1>Lanhu Workbench</h1>
+        <p class="lede">蓝湖设计稿还原工作台：抓取真实 schema 与资产，生成带交互的基线，实现到项目代码，并用视觉与行为证据检查还原质量。</p>
+      </div>
+      <div class="status"><span class="dot"></span> interactive baseline enabled</div>
+    </header>
+
+    <main>
+      <section>
+        <div class="section-head">
+          <h2>Workflow Checklist</h2>
+          <span class="tag">schema first</span>
+        </div>
+        <div class="steps">
+          <div class="step"><div class="num">1</div><div><strong>Fetch Lanhu artifacts</strong><p>保存 `.schema.json`、预览 PNG、tokens、image mapping 和本地切图。</p></div><div class="badge good">required</div></div>
+          <div class="step"><div class="num">2</div><div><strong>Generate interactive baseline</strong><p>用 rowDims 还原视觉层，并推断按钮、输入框、tab、开关和下拉等可操作控件。</p></div><div class="badge good">enabled</div></div>
+          <div class="step"><div class="num">3</div><div><strong>Implement in target project</strong><p>沿用项目组件、样式系统、路由和状态管理，不把蓝湖生成层名直接搬进业务代码。</p></div><div class="badge warn">agent</div></div>
+          <div class="step"><div class="num">4</div><div><strong>Review parity and interactions</strong><p>对照 schema、预览图、baseline report 和本地页面，记录视觉漂移与交互缺口。</p></div><div class="badge todo">check</div></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>Coverage Snapshot</h2>
+          <span class="tag">report fields</span>
+        </div>
+        <div class="grid">
+          <div class="metric"><b>100%</b><span>本地资产优先，避免蓝湖 CDN 泄漏到实现代码。</span></div>
+          <div class="metric"><b>rowDims</b><span>坐标、尺寸、裁切和绝对层级由 schema 驱动。</span></div>
+          <div class="metric"><b>roles</b><span>输出 interaction_roles，便于快速看交互覆盖。</span></div>
+          <div class="metric"><b>hook</b><span>写入 UI 文件后提示刷新还原与交互检查。</span></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>Plugin Commands</h2>
+          <span class="tag">aligned with Figma</span>
+        </div>
+        <table>
+          <thead><tr><th>Command</th><th>Intent</th><th>Agent</th></tr></thead>
+          <tbody>
+            <tr><td><code>/restore-from-lanhu</code></td><td>端到端抓取、基线、实现与检查。</td><td>implementation</td></tr>
+            <tr><td><code>/implement-from-lanhu</code></td><td>面向项目代码的设计稿实现，要求真实交互。</td><td>implementation</td></tr>
+            <tr><td><code>/review-lanhu-parity</code></td><td>审查视觉和行为还原差异。</td><td>parity review</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>Interaction Rules</h2>
+          <span class="tag">baseline JS</span>
+        </div>
+        <div class="notes">
+          <div class="rule"><mark></mark><div>常见按钮和链接会产生点击反馈，并记录 `data-last-interaction`。</div></div>
+          <div class="rule"><mark></mark><div>输入框使用原生 `input`，保留蓝湖尺寸与样式，支持键盘输入和焦点轮廓。</div></div>
+          <div class="rule"><mark></mark><div>tab、radio、switch、select 会更新 ARIA 状态和可见反馈，便于人工或自动化验证。</div></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

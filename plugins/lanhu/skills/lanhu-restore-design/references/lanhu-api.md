@@ -23,6 +23,8 @@ Important parameters:
 - `image_id`: design image id for a single design URL
 - `docId`: alternate design image id used by some Lanhu routes
 
+Some `detailDetach` URLs omit `tid`. In that case, fetch the target by `project_id` and `image_id`; do not reject the URL before trying `project/multi_info`.
+
 ## Authentication
 
 Lanhu web APIs require the full browser Cookie state. A standalone JWT/token string is not enough for SSO-protected teams.
@@ -118,6 +120,7 @@ Purpose:
 
 - Returns `data.data_resource_url`.
 - The script downloads that URL to produce `<name>.schema.json`.
+- Some image versions return `版本数据不存在` here. When that happens, fetch raw Sketch JSON and generate a fallback schema.
 
 ### Fetch raw Sketch JSON
 
@@ -136,6 +139,7 @@ Purpose:
 
 - Returns versions with `json_url`.
 - The script downloads the selected `json_url` and extracts high-risk visual tokens into `<name>.tokens.txt`.
+- Also acts as a fallback source for schema generation when DDS schema data is unavailable.
 
 ### Optional official code package
 
@@ -152,6 +156,7 @@ Purpose:
 ## Local Outputs
 
 - `<name>.schema.json`: authoritative UI data
+- `<name>.sketch.json`: raw Sketch fallback source when available
 - `<name>.tokens.txt`: supplemental high-risk style summary
 - `<name>.png`: preview image
 - `assets/slices/img_N.*`: localized image assets

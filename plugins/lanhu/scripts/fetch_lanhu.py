@@ -77,14 +77,12 @@ def parse_lanhu_url(url: str) -> dict:
 
     params = {k.strip(): v.strip() for k, v in parse_qsl(url, keep_blank_values=True)}
 
-    team_id = params.get("tid")
+    team_id = params.get("tid") or params.get("team_id")
     project_id = params.get("pid") or params.get("project_id")
     doc_id = params.get("docId") or params.get("image_id")
 
     if not project_id:
         raise ValueError("URL missing required param: pid (project_id)")
-    if not team_id:
-        raise ValueError("URL missing required param: tid (team_id)")
 
     route = ""
     if original_url.startswith("http"):
@@ -183,9 +181,12 @@ async def get_version_id(
     client: httpx.AsyncClient, project_id: str, team_id: str, image_id: str
 ) -> str:
     """通过 multi_info API 获取设计图的 latest_version（version_id）"""
+    params = {"project_id": project_id, "img_limit": 500, "detach": 1}
+    if team_id:
+        params["team_id"] = team_id
     resp = await client.get(
         f"{BASE_URL}/api/project/multi_info",
-        params={"project_id": project_id, "team_id": team_id, "img_limit": 500, "detach": 1},
+        params=params,
     )
     if resp.status_code >= 400:
         raise RuntimeError(describe_auth_failure(resp, "project/multi_info"))
@@ -211,9 +212,12 @@ async def get_design_from_multi_info(
     image_id: str,
 ) -> tuple[dict, str]:
     """Find one design and its latest version from multi_info without listing all images."""
+    params = {"project_id": project_id, "img_limit": 500, "detach": 1}
+    if team_id:
+        params["team_id"] = team_id
     resp = await client.get(
         f"{BASE_URL}/api/project/multi_info",
-        params={"project_id": project_id, "team_id": team_id, "img_limit": 500, "detach": 1},
+        params=params,
     )
     if resp.status_code >= 400:
         raise RuntimeError(describe_auth_failure(resp, "project/multi_info"))
@@ -623,6 +627,188 @@ def extract_design_tokens(sketch_data: dict) -> str:
     return "\n\n".join(tokens)
 
 
+def _sketch_frame(node: dict) -> dict:
+    frame = node.get("realFrame") or node.get("frame") or {}
+    return {
+        "left": frame.get("left", 0) or 0,
+        "top": frame.get("top", 0) or 0,
+        "width": frame.get("width", 0) or 0,
+        "height": frame.get("height", 0) or 0,
+    }
+
+
+def _sketch_color(color: dict | None) -> str:
+    if not color:
+        return ""
+    value = color.get("value")
+    if isinstance(value, str) and value:
+        return value
+    r = round(float(color.get("r", 0)) * 255)
+    g = round(float(color.get("g", 0)) * 255)
+    b = round(float(color.get("b", 0)) * 255)
+    a = color.get("a", 1)
+    return f"rgba({r},{g},{b},{a})"
+
+
+def _sketch_gradient(fill: dict) -> str:
+    gradient = fill.get("gradient") or {}
+    stops = gradient.get("stops") or gradient.get("colorStops") or []
+    from_pt = gradient.get("from") or {"x": 0.5, "y": 0}
+    to_pt = gradient.get("to") or {"x": 0.5, "y": 1}
+    dx = float(to_pt.get("x", 0.5)) - float(from_pt.get("x", 0.5))
+    dy = float(to_pt.get("y", 1)) - float(from_pt.get("y", 0))
+    angle = math.degrees(math.atan2(dx, dy)) % 360
+    parts = []
+    for stop in stops:
+        color = _sketch_color(stop.get("color"))
+        position = float(stop.get("position", 0)) * 100
+        if color:
+            parts.append(f"{color} {position}%")
+    return f"linear-gradient({angle}deg, {', '.join(parts)})" if parts else ""
+
+
+def _sketch_radius(radius) -> str | None:
+    if radius in (None, [], {}):
+        return None
+    if isinstance(radius, dict):
+        values = [
+            radius.get("topLeft", 0) or 0,
+            radius.get("topRight", 0) or 0,
+            radius.get("bottomRight", 0) or 0,
+            radius.get("bottomLeft", 0) or 0,
+        ]
+        if len(set(values)) == 1:
+            return values[0]
+        return " ".join(f"{v}px" for v in values)
+    if isinstance(radius, list):
+        if not radius:
+            return None
+        if len(set(radius)) == 1:
+            return radius[0]
+        return " ".join(f"{v}px" for v in radius)
+    return radius
+
+
+def _sketch_style(node: dict, root: bool = False) -> dict:
+    source = node.get("style") or {}
+    style: dict = {}
+    if node.get("opacity") not in (None, 1):
+        style["opacity"] = node.get("opacity")
+    if source.get("opacity") not in (None, 1):
+        style["opacity"] = source.get("opacity")
+
+    if node.get("type") != "textLayer":
+        for fill in source.get("fills") or []:
+            if not fill.get("isEnabled", True):
+                continue
+            fill_type = fill.get("type")
+            if fill_type == "gradient":
+                gradient = _sketch_gradient(fill)
+                if gradient:
+                    style["background"] = gradient
+                    break
+            elif fill_type in {"color", "solid"}:
+                color = _sketch_color(fill.get("color"))
+                if color:
+                    style["backgroundColor"] = color
+                    break
+
+    shadows = []
+    for shadow in source.get("shadows") or []:
+        if not shadow.get("isEnabled", True):
+            continue
+        inset = "inset " if shadow.get("inset") else ""
+        color = _sketch_color(shadow.get("color")) or "rgba(0,0,0,0.2)"
+        shadows.append(
+            f"{inset}{shadow.get('x', 0)}px {shadow.get('y', 0)}px "
+            f"{shadow.get('blur', shadow.get('blurRadius', 0))}px {shadow.get('spread', 0)}px {color}"
+        )
+    if shadows:
+        style["boxShadow"] = ", ".join(shadows)
+
+    borders = [b for b in (source.get("borders") or []) if b.get("isEnabled", True)]
+    if borders:
+        border = borders[0]
+        style["borderWidth"] = border.get("thickness", border.get("width", 1))
+        style["borderColor"] = _sketch_color(border.get("color")) or "rgba(0,0,0,1)"
+        style["borderStyle"] = "solid"
+
+    radius = _sketch_radius(node.get("radius"))
+    if radius is not None:
+        style["borderRadius"] = radius
+
+    if node.get("type") == "textLayer":
+        text = node.get("text") or {}
+        text_style = text.get("style") or {}
+        font = text_style.get("font") or {}
+        color = _sketch_color(text_style.get("color"))
+        if color:
+            style["color"] = color
+        if font.get("name"):
+            style["fontFamily"] = font.get("name")
+        if font.get("size"):
+            style["fontSize"] = font.get("size")
+        if font.get("fontWeight"):
+            style["fontWeight"] = font.get("fontWeight")
+        if font.get("lineHeight"):
+            style["lineHeight"] = font.get("lineHeight")
+        if font.get("align"):
+            style["textAlign"] = font.get("align")
+        style["whiteSpace"] = "pre-wrap"
+
+    if root and "background" not in style and "backgroundColor" not in style:
+        style["backgroundColor"] = "#ffffff"
+    return style
+
+
+def sketch_to_lanhu_schema(sketch_data: dict) -> dict:
+    """Convert Lanhu raw Sketch JSON into the renderer's schema subset."""
+    artboard = sketch_data.get("artboard") or {}
+    root_frame = _sketch_frame(artboard)
+
+    def convert(node: dict) -> dict:
+        node_type = node.get("type")
+        converted_type = "lanhulayer"
+        data = {}
+        if node_type == "textLayer":
+            converted_type = "lanhutext"
+            data["value"] = ((node.get("text") or {}).get("value") or "")
+        elif node.get("hasExportImage") or node.get("hasExportDDSImage"):
+            converted_type = "lanhuimage"
+
+        result = {
+            "id": node.get("id"),
+            "eleName": node.get("name") or node.get("id") or converted_type,
+            "type": converted_type,
+            "isVisible": node.get("visible", True),
+            "rowDims": _sketch_frame(node),
+            "style": _sketch_style(node),
+            "children": [convert(child) for child in node.get("layers") or []],
+        }
+        if data:
+            result["data"] = data
+        return result
+
+    return {
+        "id": artboard.get("id"),
+        "eleName": artboard.get("name") or "Lanhu Artboard",
+        "type": "lanhuartboard",
+        "designType": "sketch-fallback",
+        "rowDims": {
+            "left": 0,
+            "top": 0,
+            "width": root_frame.get("width", 0),
+            "height": root_frame.get("height", 0),
+        },
+        "style": _sketch_style(artboard, root=True),
+        "children": [convert(child) for child in artboard.get("layers") or []],
+        "meta": {
+            "source": "sketch-json-fallback",
+            "originalFrame": root_frame,
+        },
+    }
+
+
 # ==================== 图片资源 ====================
 
 def collect_image_urls_from_schema(schema: dict) -> list[str]:
@@ -796,14 +982,14 @@ async def run(args):
             version_id = await get_version_id(client, project_id, team_id, image_id)
 
         print("  → 拉取 DDS Schema JSON ...", file=sys.stderr)
-        schema = await fetch_dds_schema(version_id, cookie)
-
-        schema_path = output_dir / f"{target['name']}.schema.json"
-        schema_path.write_text(json.dumps(schema, ensure_ascii=False, indent=2), encoding="utf-8")
-        result["schema_path"] = str(schema_path)
-        print(f"  ✓ Schema JSON → {schema_path}", file=sys.stderr)
+        schema = None
+        try:
+            schema = await fetch_dds_schema(version_id, cookie)
+        except Exception as e:
+            print(f"  ⚠ DDS Schema 获取失败，尝试 Sketch JSON fallback: {e}", file=sys.stderr)
 
         # —— 获取 Sketch JSON + Design Tokens ——
+        sketch = None
         print("  → 拉取 Sketch JSON ...", file=sys.stderr)
         try:
             sketch = await get_sketch_json(
@@ -813,6 +999,13 @@ async def run(args):
                 image_id,
                 expected_version_id=version_id,
             )
+            sketch_path = output_dir / f"{target['name']}.sketch.json"
+            sketch_path.write_text(json.dumps(sketch, ensure_ascii=False, indent=2), encoding="utf-8")
+            result["sketch_path"] = str(sketch_path)
+            if schema is None:
+                schema = sketch_to_lanhu_schema(sketch)
+                result["schema_source"] = "sketch-json-fallback"
+
             tokens = extract_design_tokens(sketch)
             if tokens:
                 tokens_path = output_dir / f"{target['name']}.tokens.txt"
@@ -823,6 +1016,14 @@ async def run(args):
                 print("  ℹ Design Tokens: 无高风险属性", file=sys.stderr)
         except Exception as e:
             print(f"  ⚠ Sketch JSON 获取失败（Design Tokens 跳过）: {e}", file=sys.stderr)
+
+        if schema is None:
+            raise Exception("无法获取 DDS Schema，也无法从 Sketch JSON 生成 fallback schema")
+
+        schema_path = output_dir / f"{target['name']}.schema.json"
+        schema_path.write_text(json.dumps(schema, ensure_ascii=False, indent=2), encoding="utf-8")
+        result["schema_path"] = str(schema_path)
+        print(f"  ✓ Schema JSON → {schema_path}", file=sys.stderr)
 
         # —— 下载图片 ——
         if args.download_images:

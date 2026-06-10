@@ -4,7 +4,7 @@ Use `scripts/restore_lanhu.py` as the first implementation baseline after Lanhu 
 
 ## Baseline Strategy
 
-The generator creates a static HTML parity baseline by:
+The generator creates an interactive HTML parity baseline by:
 
 - reading `<name>.schema.json`
 - replacing Lanhu remote image URLs with paths from `<name>.image_mapping.json`

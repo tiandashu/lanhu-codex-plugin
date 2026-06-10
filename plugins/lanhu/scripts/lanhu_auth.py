@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import getpass
 import json
 import os
 import sys
@@ -199,6 +200,96 @@ def _cookie_header_from_playwright(cookies: list[dict]) -> str:
     return "; ".join(filtered)
 
 
+def _normalize_cookie_header(cookie: str) -> str:
+    cookie = (cookie or "").strip()
+    cookie = cookie.replace("\r\n", "\n").replace("\r", "\n")
+    pieces: list[str] = []
+    ignored = {
+        "path",
+        "domain",
+        "expires",
+        "max-age",
+        "secure",
+        "httponly",
+        "samesite",
+        "priority",
+        "partitioned",
+    }
+    for line in cookie.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        lower = line.lower()
+        if lower.startswith("cookie:"):
+            line = line.split(":", 1)[1].strip()
+        elif lower.startswith("set-cookie:"):
+            line = line.split(":", 1)[1].strip()
+        for part in line.split(";"):
+            item = part.strip().strip("\"'")
+            if not item or "=" not in item:
+                continue
+            name, value = item.split("=", 1)
+            name = name.strip().strip("\"'")
+            if not name or name.lower() in ignored:
+                continue
+            pieces.append(f"{name}={value.strip()}")
+
+    deduped: dict[str, str] = {}
+    for item in pieces:
+        name, value = item.split("=", 1)
+        deduped[name] = value
+    return "; ".join(f"{name}={value}" for name, value in deduped.items())
+
+
+def _cookies_from_header(cookie_header: str) -> list[dict]:
+    cookies: list[dict] = []
+    for part in cookie_header.split(";"):
+        item = part.strip()
+        if not item or "=" not in item:
+            continue
+        name, value = item.split("=", 1)
+        name = name.strip()
+        if not name:
+            continue
+        cookies.append(
+            {
+                "name": name,
+                "value": value.strip(),
+                "domain": ".lanhuapp.com",
+                "path": "/",
+                "expires": -1,
+                "httpOnly": False,
+                "secure": True,
+                "sameSite": "Lax",
+            }
+        )
+    return cookies
+
+
+def import_cookie(args: argparse.Namespace) -> int:
+    cookie_header = _normalize_cookie_header(args.cookie or "")
+    if not cookie_header:
+        print("Paste Lanhu Cookie header. Input is hidden; press Enter when done.")
+        cookie_header = _normalize_cookie_header(getpass.getpass("Cookie: "))
+
+    if not cookie_header or "=" not in cookie_header:
+        print("Error: Cookie header is empty or invalid.", file=sys.stderr)
+        return 1
+
+    cookies = _cookies_from_header(cookie_header)
+    payload = {
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "login_url": args.url or DEFAULT_LOGIN_URL,
+        "cookie_header": cookie_header,
+        "cookies": cookies,
+        "source": "manual-import",
+    }
+    auth_file = save_cookie_store(payload, Path(args.auth_file) if args.auth_file else None)
+    print(f"Saved encrypted Lanhu cookies to: {auth_file}")
+    print(f"Imported {len(cookies)} cookie names.")
+    return 0
+
+
 def login(args: argparse.Namespace) -> int:
     try:
         from playwright.sync_api import sync_playwright
@@ -279,6 +370,14 @@ def build_parser() -> argparse.ArgumentParser:
     login_parser = subparsers.add_parser("login", help="Open browser login and save encrypted cookies")
     login_parser.add_argument("--url", default=DEFAULT_LOGIN_URL, help="Lanhu URL to open for login")
     login_parser.set_defaults(func=login)
+
+    import_parser = subparsers.add_parser(
+        "import-cookie",
+        help="Paste a Lanhu Cookie request header locally and save it encrypted",
+    )
+    import_parser.add_argument("--url", default=DEFAULT_LOGIN_URL, help="Lanhu URL associated with this cookie")
+    import_parser.add_argument("--cookie", help="Cookie header value. Avoid this; prefer the hidden prompt.")
+    import_parser.set_defaults(func=import_cookie)
 
     status_parser = subparsers.add_parser("status", help="Show encrypted cookie store metadata")
     status_parser.set_defaults(func=status)

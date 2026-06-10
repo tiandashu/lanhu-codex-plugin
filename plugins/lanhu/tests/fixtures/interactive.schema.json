@@ -1,0 +1,149 @@
+{
+  "designType": "web",
+  "rowDims": {
+    "width": 390,
+    "height": 360
+  },
+  "style": {
+    "backgroundColor": "#ffffff"
+  },
+  "children": [
+    {
+      "type": "lanhulayer",
+      "id": "tab-a",
+      "eleName": "Tab 首页",
+      "rowDims": {
+        "left": 24,
+        "top": 40,
+        "width": 84,
+        "height": 36
+      },
+      "style": {
+        "backgroundColor": "#eef5ff",
+        "borderRadius": 8
+      },
+      "children": [
+        {
+          "type": "lanhutext",
+          "id": "tab-a-text",
+          "eleName": "首页文案",
+          "rowDims": {
+            "left": 46,
+            "top": 48,
+            "width": 40,
+            "height": 18
+          },
+          "style": {
+            "fontSize": 14,
+            "color": "#1677ff"
+          },
+          "data": {
+            "value": "首页"
+          }
+        }
+      ]
+    },
+    {
+      "type": "lanhulayer",
+      "id": "tab-b",
+      "eleName": "Tab 我的",
+      "rowDims": {
+        "left": 116,
+        "top": 40,
+        "width": 84,
+        "height": 36
+      },
+      "style": {
+        "backgroundColor": "#f2f4f7",
+        "borderRadius": 8
+      },
+      "children": [
+        {
+          "type": "lanhutext",
+          "id": "tab-b-text",
+          "eleName": "我的文案",
+          "rowDims": {
+            "left": 138,
+            "top": 48,
+            "width": 40,
+            "height": 18
+          },
+          "style": {
+            "fontSize": 14,
+            "color": "#344054"
+          },
+          "data": {
+            "value": "我的"
+          }
+        }
+      ]
+    },
+    {
+      "type": "lanhulayer",
+      "id": "phone-input",
+      "eleName": "手机号输入框",
+      "rowDims": {
+        "left": 24,
+        "top": 116,
+        "width": 250,
+        "height": 44
+      },
+      "style": {
+        "backgroundColor": "#f8fafc",
+        "borderWidth": 1,
+        "borderColor": "#d0d5dd",
+        "borderRadius": 8
+      }
+    },
+    {
+      "type": "lanhulayer",
+      "id": "notice-switch",
+      "eleName": "通知开关",
+      "rowDims": {
+        "left": 300,
+        "top": 124,
+        "width": 48,
+        "height": 28
+      },
+      "style": {
+        "backgroundColor": "#d0d5dd",
+        "borderRadius": 14
+      }
+    },
+    {
+      "type": "lanhubutton",
+      "id": "login-button",
+      "eleName": "登录按钮",
+      "rowDims": {
+        "left": 24,
+        "top": 216,
+        "width": 160,
+        "height": 44
+      },
+      "style": {
+        "backgroundColor": "#1677ff",
+        "borderRadius": 8
+      },
+      "children": [
+        {
+          "type": "lanhutext",
+          "id": "login-text",
+          "eleName": "登录文案",
+          "rowDims": {
+            "left": 88,
+            "top": 228,
+            "width": 40,
+            "height": 18
+          },
+          "style": {
+            "fontSize": 16,
+            "color": "#ffffff"
+          },
+          "data": {
+            "value": "登录"
+          }
+        }
+      ]
+    }
+  ]
+}

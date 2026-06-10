@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python ./scripts/post_write_lanhu_parity_check.py"
+          }
+        ]
+      }
+    ]
+  }
+}

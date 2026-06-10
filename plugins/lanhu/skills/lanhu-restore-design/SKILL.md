@@ -5,13 +5,13 @@ description: "Restore Lanhu designs into target project code with high visual fi
 
 # Lanhu Design Restoration
 
-This skill orchestrates end-to-end Lanhu design restoration. It turns a Lanhu design into maintainable project code by fetching structured design data, localizing assets, generating a static parity baseline, implementing from schema values, and verifying parity.
+This skill orchestrates end-to-end Lanhu design restoration. It turns a Lanhu design into maintainable project code by fetching structured design data, localizing assets, generating an interactive parity baseline, implementing from schema values, and verifying visual plus behavioral parity.
 
 Use the smaller Lanhu skills for focused phases:
 
 - `lanhu-use`: authentication, script safety, URL parsing, and error recovery.
 - `lanhu-fetch-design`: list/fetch designs and produce local schema, tokens, preview, and assets.
-- `lanhu-generate-baseline`: create the static HTML parity checkpoint.
+- `lanhu-generate-baseline`: create the interactive HTML parity checkpoint.
 - `lanhu-verify-parity`: validate baseline and final implementation.
 
 ## Core Rule
@@ -69,11 +69,11 @@ Also detect the style system: CSS Modules, scoped Vue styles, SCSS, Tailwind, St
 
 If a root `DESIGN.md` or equivalent design-system document exists, read it before generating code. Use it for tokens, themes, reusable components, naming, accessibility, directory layout, and style conventions. Concrete layer values still come from `.schema.json`; if there is an unavoidable conflict, preserve visual parity and report the tradeoff.
 
-### Step 3: Generate Static Baseline
+### Step 3: Generate Interactive Baseline
 
 Use `lanhu-generate-baseline`.
 
-Create `restore/index.html` and `restore/parity-report.json` before framework translation. Use the generated baseline as the first fidelity checkpoint.
+Create `restore/index.html` and `restore/parity-report.json` before framework translation. Use the generated baseline as the first fidelity checkpoint for both static visuals and inferred interactions.
 
 ### Step 4: Plan The Implementation
 
@@ -84,6 +84,7 @@ Before editing app code, identify:
 - required local assets
 - visible sections in the preview PNG
 - repeated or semantic components worth extracting
+- controls and flows that must be real in code, not static shapes
 - project design-system rules that must be respected
 
 Prefer a page-level component first. Extract child components only when they are repeated, have a clear business boundary, or map to obvious reusable UI modules such as cards, list items, navigation, forms, dialogs, and tabs.
@@ -105,6 +106,8 @@ Suggested HTML mapping:
 - `lanhutext`: `span` or semantic text element
 - `lanhuimage`: `img`
 - `lanhubutton`: `button`
+- input-like layers: `input`, `textarea`, or the target platform equivalent
+- tab/switch/select-like layers: real native or project design-system controls with visible state changes
 - other/container layers: `div` or the target platform equivalent
 
 Keep class names semantic. For CSS and SCSS, prefer BEM-style kebab-case names such as `study-card__title` instead of generated names such as `group_4`.
@@ -141,6 +144,19 @@ Borrow Figma's incremental pattern: inspect, create a stable wrapper/page, imple
 
 Do not build on a broken baseline or a section with known visual drift.
 
+## Interaction Parity
+
+Do not leave visually interactive elements inert. Restore behavior for:
+
+- primary and secondary actions
+- links and navigation affordances
+- text inputs, search fields, password fields, and verification-code fields
+- tabs, segmented controls, radios, checkboxes, switches, and selects
+- dialogs, drawers, popovers, dropdown menus, and close/back affordances
+- disabled, selected, focused, loading, and active states when they are visible or implied by layer names
+
+The generated baseline uses heuristics from layer type, layer name, text, and children to expose likely controls. In production code, confirm the correct behavior from the product context and existing app conventions.
+
 ## Use Tokens As A Gap Check
 
 Read `<name>.tokens.txt` after implementation. Only use it when the schema-derived implementation appears to be missing a complex visual property. Never overwrite a schema value with a token summary.
@@ -157,6 +173,7 @@ Use `lanhu-verify-parity` before finishing. At minimum, compare generated code a
 - margins, padding, and gaps are preserved
 - local images are used and visible
 - visible elements from the PNG are present
+- visible controls are keyboard-accessible and trigger observable state changes
 - no Lanhu CDN URL remains in app code
 - complex radius, shadow, opacity, and gradient values are complete
 - components are not over-split and names are semantic

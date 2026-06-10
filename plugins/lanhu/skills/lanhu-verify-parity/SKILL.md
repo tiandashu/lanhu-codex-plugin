@@ -1,11 +1,24 @@
 ---
 name: lanhu-verify-parity
-description: "Verify visual and implementation parity for Lanhu design restoration. Use after generating a baseline or implementing Lanhu design code to check schema fidelity, preview PNG match, local asset usage, styling completeness, and framework adaptation risks."
+description: "Verify visual, interaction, and implementation parity for Lanhu design restoration. Use after generating a baseline or implementing Lanhu design code to check schema fidelity, preview PNG match, local asset usage, styling completeness, real control behavior, and framework adaptation risks."
 ---
 
 # Verify Lanhu Parity
 
 Use this skill to validate that restored UI code still follows Lanhu's schema and visible preview. It is useful both after baseline generation and after target-framework implementation.
+
+## 99% Gate
+
+For Lanhu baseline outputs, run the automated verifier and treat 99% visual match as the default pass threshold:
+
+```bash
+python <plugin-root>/scripts/verify_lanhu.py \
+  --input-dir "$OUTPUT_DIR" \
+  --threshold 99 \
+  --require-interactions
+```
+
+The verifier renders `restore/index.html`, captures a screenshot, compares it against the Lanhu preview PNG, writes `verify/verify-report.json`, and exits non-zero below the configured threshold.
 
 ## Validation Inputs
 
@@ -15,7 +28,7 @@ Use all available inputs:
 - `.png` preview for visible-frame composition
 - `.tokens.txt` for supplemental complex-property checks
 - `.image_mapping.json` and `assets/slices/` for image localization
-- `restore/parity-report.json` when a static baseline exists
+- `restore/parity-report.json` when an interactive baseline exists
 - Target app source files and rendered app screenshots when implementation is complete
 
 ## Verification Checklist
@@ -30,6 +43,9 @@ Check these before finalizing:
 - Borders, non-uniform radii, multiple shadows, inset shadows, and opacity are complete.
 - Local assets render and no Lanhu CDN URL remains in app code.
 - Visible elements in the preview PNG exist in the implementation.
+- Screenshot-based `visual_match_percent` is at least 99% unless the user explicitly accepts a lower target for a non-overlay, framework-native rebuild.
+- Buttons, links, inputs, tabs, toggles, selects, and navigation affordances are real controls, not inert decorative layers.
+- Focus states, selected states, toggled states, opened/closed states, and form input updates are observable where the design implies them.
 - Hidden layers, alternate states, and covered screens are skipped unless the user requested them.
 - Components are not over-split; extracted components have a repeated or semantic business boundary.
 - Project conventions from `DESIGN.md`, local components, or existing styling patterns are followed.
@@ -41,6 +57,7 @@ When the target project can run locally, start its dev server and inspect the im
 - No overlapping text or controls.
 - No cropped text unless the design clips it.
 - Images are visible at expected sizes.
+- Clicking or typing into visible controls changes state, navigates locally, opens the expected panel, or otherwise performs the intended project behavior.
 - Mobile or responsive behavior only changes when the target platform requires it or the user asked for it.
 
 For static HTML outputs, a local file or simple HTTP server is enough. For framework apps, use the project's existing dev command and available test scripts.

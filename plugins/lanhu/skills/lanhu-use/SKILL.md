@@ -39,6 +39,14 @@ python <plugin-root>/scripts/lanhu_auth.py login --url "$LANHU_URL"
 
 The helper opens an interactive browser, lets the user complete Lanhu or team SSO login, and encrypts cookies locally with Windows DPAPI. Reuse saved cookies unless access fails.
 
+If the user already has a full browser `Cookie:` request header, import it through the hidden local prompt instead of pasting it into chat or shell history:
+
+```bash
+python <plugin-root>/scripts/lanhu_auth.py import-cookie --url "$LANHU_URL"
+```
+
+The import command accepts `Cookie:` or `Set-Cookie:`-style input, filters response attributes such as `Path`, `Domain`, `Expires`, and `SameSite`, deduplicates cookie names, and saves the cleaned header encrypted.
+
 To reset a wrong or expired team session:
 
 ```bash
@@ -50,7 +58,7 @@ python <plugin-root>/scripts/lanhu_auth.py login --url "$LANHU_URL"
 
 Lanhu project URLs normally include `tid` and `pid`. Single-design URLs may include `image_id`.
 
-- If the URL includes `image_id`, fetch that design directly.
+- If the URL includes `image_id`, fetch that design directly. `detailDetach` URLs may omit `tid`; in that case use `project_id` and `image_id` first.
 - If no design id/index/name is provided, list designs first and ask the user for an `index` or exact `name`.
 - Do not guess the intended design when a project contains multiple designs.
 
