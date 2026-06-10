@@ -6,11 +6,13 @@ It provides:
 
 - `lanhu-use` for authentication, script safety, URL parsing, and error recovery
 - `lanhu-fetch-design` for listing designs and fetching schema, preview, tokens, and assets
+- `lanhu-design-system` for scanning `DESIGN.md`, local components, styles, and tokens before implementation
 - `lanhu-generate-baseline` for creating a schema-first interactive HTML parity baseline
 - `lanhu-verify-parity` for final visual, interaction, and implementation checks
 - `lanhu-restore-design` for end-to-end schema-first Lanhu implementation
 - `/restore-from-lanhu`, `/implement-from-lanhu`, and `/review-lanhu-parity` command prompts
 - `scripts/fetch_lanhu.py` for listing designs, fetching schema JSON, extracting design tokens, downloading preview images, and localizing image assets
+- `scripts/inspect_design_system.py` for indexing local design-system docs, component declarations, CSS selectors, and likely token/variable names
 - `scripts/restore_lanhu.py` for generating a schema-first interactive HTML parity baseline with inferred buttons, inputs, tabs, toggles, selects, links, and keyboard/focus behavior
 - `scripts/verify_lanhu.py` for screenshot-based visual parity verification with a default 99% pass threshold
 - `ui/lanhu-workbench.html` for the plugin workflow dashboard
@@ -46,7 +48,7 @@ If you need to paste a browser `Cookie:` request header manually, use the hidden
 python scripts/lanhu_auth.py import-cookie --url "<LANHU_URL>"
 ```
 
-`fetch_lanhu.py` reads the encrypted cookie store by default. `--cookie` is still available for debugging, but environment-variable authentication is no longer the recommended flow.
+`fetch_lanhu.py` reads the encrypted cookie store by default. `--cookie` is still available for local debugging when you already have a full browser `Cookie:` request header.
 
 The encrypted cookie store is reused across runs. Log in again only when the saved cookies expire, are cleared, or no longer have access to the target Lanhu team/project.
 
@@ -68,7 +70,7 @@ python scripts/fetch_lanhu.py \
   --output-dir ./lanhu_output
 ```
 
-Single design URLs containing `image_id` are supported directly, including `detailDetach` links that omit `tid`. The script uses `project/multi_info` to find the latest design version before fetching DDS schema data. If DDS schema data is unavailable for an older or raster-backed design version, the script falls back to raw Sketch JSON and the generated baseline uses the preview PNG as a visual backing image with transparent interactive hit areas.
+Single design URLs containing `image_id` are supported directly, including `detailDetach` links that omit `tid`, such as `...?pid=<project_id>&project_id=<project_id>&image_id=<image_id>&fromEditor=true`. The script uses `project/multi_info` to find the latest design version before fetching DDS schema data. If DDS schema data is unavailable for an older or raster-backed design version, the script falls back to raw Sketch JSON and the generated baseline uses the preview PNG as a visual backing image with transparent interactive hit areas.
 
 Generate a high-fidelity interactive HTML baseline:
 
@@ -86,6 +88,17 @@ Then open `http://127.0.0.1:8766/restore/index.html`.
 
 The generated `.schema.json` is the source of truth for implementation. The preview `.png` is used to confirm visible layers, and `.tokens.txt` is only a supplemental check for complex visual attributes.
 
+Inspect local design-system assets before implementing into an existing project:
+
+```bash
+python scripts/inspect_design_system.py \
+  --project-root /path/to/target-app \
+  --query "button primary" \
+  --output ./lanhu_output/design-system-report.json
+```
+
+The report lists discovered design docs, components, style selectors, likely tokens, and focused query matches. Use those candidates when they preserve Lanhu visual and interaction parity.
+
 Run the 99% visual parity gate:
 
 ```bash
@@ -94,7 +107,7 @@ python scripts/verify_lanhu.py --input-dir ./lanhu_output --threshold 99 --requi
 
 The verifier renders `restore/index.html`, captures a screenshot, compares it against the Lanhu preview PNG, writes `verify/verify-report.json`, and exits non-zero if visual parity is below the threshold.
 
-To reproduce the old static-only baseline for debugging:
+Generate a static baseline without inferred interactions:
 
 ```bash
 python scripts/restore_lanhu.py --input-dir ./lanhu_output --output-dir ./lanhu_output/restore --no-interactions

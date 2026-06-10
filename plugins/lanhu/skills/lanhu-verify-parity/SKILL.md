@@ -28,7 +28,7 @@ Use all available inputs:
 - `.png` preview for visible-frame composition
 - `.tokens.txt` for supplemental complex-property checks
 - `.image_mapping.json` and `assets/slices/` for image localization
-- `restore/parity-report.json` when an interactive baseline exists
+- `restore/parity-report.json` when an interactive baseline exists, especially `interaction_contracts` and `component_candidates`
 - Target app source files and rendered app screenshots when implementation is complete
 
 ## Verification Checklist
@@ -46,8 +46,9 @@ Check these before finalizing:
 - Screenshot-based `visual_match_percent` is at least 99% unless the user explicitly accepts a lower target for a non-overlay, framework-native rebuild.
 - Buttons, links, inputs, tabs, toggles, selects, and navigation affordances are real controls, not inert decorative layers.
 - Focus states, selected states, toggled states, opened/closed states, and form input updates are observable where the design implies them.
+- Each relevant `interaction_contracts` item has a matching implementation behavior or a documented reason it is out of scope.
 - Hidden layers, alternate states, and covered screens are skipped unless the user requested them.
-- Components are not over-split; extracted components have a repeated or semantic business boundary.
+- Components are neither under-split nor over-split; compare extracted components with `component_candidates` and prefer semantic or repeated boundaries.
 - Project conventions from `DESIGN.md`, local components, or existing styling patterns are followed.
 
 ## Rendered-App Checks
@@ -58,6 +59,7 @@ When the target project can run locally, start its dev server and inspect the im
 - No cropped text unless the design clips it.
 - Images are visible at expected sizes.
 - Clicking or typing into visible controls changes state, navigates locally, opens the expected panel, or otherwise performs the intended project behavior.
+- Tabs, radios, segmented controls, selects, dialogs, and dismiss actions update grouped or open/closed state consistently.
 - Mobile or responsive behavior only changes when the target platform requires it or the user asked for it.
 
 For static HTML outputs, a local file or simple HTTP server is enough. For framework apps, use the project's existing dev command and available test scripts.
@@ -77,5 +79,6 @@ Summarize:
 
 - What was implemented or verified.
 - Which checks ran.
+- Which `interaction_contracts` and `component_candidates` were covered.
 - Any known deltas from the Lanhu design.
 - Any user-visible limitations, such as unavailable fonts or platform-specific substitutions.

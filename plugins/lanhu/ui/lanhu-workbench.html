@@ -251,8 +251,9 @@
         <div class="steps">
           <div class="step"><div class="num">1</div><div><strong>Fetch Lanhu artifacts</strong><p>保存 `.schema.json`、预览 PNG、tokens、image mapping 和本地切图。</p></div><div class="badge good">required</div></div>
           <div class="step"><div class="num">2</div><div><strong>Generate interactive baseline</strong><p>用 rowDims 还原视觉层，并推断按钮、输入框、tab、开关和下拉等可操作控件。</p></div><div class="badge good">enabled</div></div>
-          <div class="step"><div class="num">3</div><div><strong>Implement in target project</strong><p>沿用项目组件、样式系统、路由和状态管理，不把蓝湖生成层名直接搬进业务代码。</p></div><div class="badge warn">agent</div></div>
-          <div class="step"><div class="num">4</div><div><strong>Review parity and interactions</strong><p>对照 schema、预览图、baseline report 和本地页面，记录视觉漂移与交互缺口。</p></div><div class="badge todo">check</div></div>
+          <div class="step"><div class="num">3</div><div><strong>Inspect local design system</strong><p>扫描 DESIGN.md、本地组件、样式选择器和 token/变量候选，先找可复用实现资产。</p></div><div class="badge good">search</div></div>
+          <div class="step"><div class="num">4</div><div><strong>Implement in target project</strong><p>沿用项目组件、样式系统、路由和状态管理，不把蓝湖生成层名直接搬进业务代码。</p></div><div class="badge warn">agent</div></div>
+          <div class="step"><div class="num">5</div><div><strong>Review parity and interactions</strong><p>对照 schema、预览图、baseline report 和本地页面，记录视觉漂移与交互缺口。</p></div><div class="badge todo">check</div></div>
         </div>
       </section>
 
@@ -264,7 +265,7 @@
         <div class="grid">
           <div class="metric"><b>100%</b><span>本地资产优先，避免蓝湖 CDN 泄漏到实现代码。</span></div>
           <div class="metric"><b>rowDims</b><span>坐标、尺寸、裁切和绝对层级由 schema 驱动。</span></div>
-          <div class="metric"><b>roles</b><span>输出 interaction_roles，便于快速看交互覆盖。</span></div>
+          <div class="metric"><b>search</b><span>索引组件、样式、变量和 tokens，补齐本地设计系统检索。</span></div>
           <div class="metric"><b>hook</b><span>写入 UI 文件后提示刷新还原与交互检查。</span></div>
         </div>
       </section>
@@ -280,6 +281,7 @@
             <tr><td><code>/restore-from-lanhu</code></td><td>端到端抓取、基线、实现与检查。</td><td>implementation</td></tr>
             <tr><td><code>/implement-from-lanhu</code></td><td>面向项目代码的设计稿实现，要求真实交互。</td><td>implementation</td></tr>
             <tr><td><code>/review-lanhu-parity</code></td><td>审查视觉和行为还原差异。</td><td>parity review</td></tr>
+            <tr><td><code>inspect_design_system.py</code></td><td>检索 DESIGN.md、组件、样式和 token/变量候选。</td><td>local search</td></tr>
           </tbody>
         </table>
       </section>

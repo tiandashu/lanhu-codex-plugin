@@ -26,7 +26,7 @@ Expected outputs:
 - `restore/index.html`
 - `restore/parity-report.json`
 
-The baseline flattens visible layers with absolute row dimensions and local image references, then adds inferred native controls and a lightweight interaction script. Use it as the first visual and behavior checkpoint before building target-framework components.
+The baseline flattens visible layers with absolute row dimensions and local image references, then adds inferred native controls and a lightweight interaction script. The report also emits `interaction_contracts` and `component_candidates` so implementation can cover behavior and component boundaries deliberately. Use it as the first visual and behavior checkpoint before building target-framework components.
 
 ## Preview
 
@@ -48,6 +48,8 @@ If another process uses the port, choose another port.
 
 - Compare `restore/index.html` against the preview PNG.
 - Read `restore/parity-report.json` for missing images, unsupported layer types, interaction counts, or structural warnings.
+- Implement every relevant `interaction_contracts` item in the target app or explain why it is intentionally out of scope.
+- Use `component_candidates` to plan extraction boundaries before writing production code.
 - Use baseline layout values to cross-check framework implementation, but keep `.schema.json` authoritative when there is a conflict.
 - Do not copy generated class names blindly into production code. Prefer semantic names in the final implementation.
 - Treat inferred interactions as a starting point. Confirm against schema names, visible copy, and project behavior before finalizing production code.
@@ -60,4 +62,6 @@ Do not proceed to framework implementation if:
 - Visible layers from the preview PNG are absent.
 - The baseline report shows major unsupported or skipped layer groups that affect the requested screen.
 - The baseline report has `interaction_nodes: 0` even though the design visibly contains buttons, inputs, tabs, or other controls.
+- The baseline report has missing or obviously wrong `interaction_contracts` for visible controls; correct the implementation plan manually before coding.
+- The baseline report has no useful `component_candidates` for a complex screen; inspect the schema tree and define component boundaries manually.
 - The schema file cannot be identified unambiguously.

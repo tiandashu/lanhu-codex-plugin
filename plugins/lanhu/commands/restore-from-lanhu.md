@@ -15,12 +15,12 @@ Restore a Lanhu design into project code.
 2. Use `lanhu-use` for authentication, URL handling, and script safety.
 3. Use `lanhu-fetch-design` to list/select designs when needed and fetch schema, tokens, preview PNG, and image assets.
 4. Use `lanhu-generate-baseline` to create the interactive parity baseline with `scripts/restore_lanhu.py`.
-5. Inspect the target project conventions and any `DESIGN.md`.
-6. Implement using schema values and the generated baseline as fidelity checkpoints.
+5. Use `lanhu-design-system` / `scripts/inspect_design_system.py` to inspect target project conventions, `DESIGN.md`, reusable components, styles, variables, and token candidates.
+6. Implement using schema values, local design-system matches, and the generated baseline as fidelity checkpoints.
 7. Wire actual interactions implied by the design instead of leaving controls inert.
-8. Use `lanhu-verify-parity` for local verification and summarize visual parity, interaction coverage, and known deltas.
+8. Use `lanhu-verify-parity` for local verification and summarize visual parity, interaction coverage, design-system reuse, and known deltas.
 
-If Lanhu returns SSO or permission errors, rerun `scripts/lanhu_auth.py login --url <lanhu_url>` instead of asking the user for `LANHU_COOKIE`.
+If Lanhu returns SSO or permission errors, rerun `scripts/lanhu_auth.py login --url <lanhu_url>` instead of asking the user to paste cookies into chat.
 
 ## Escalation
 

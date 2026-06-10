@@ -19,11 +19,12 @@ The main scripts are:
 
 - `scripts/lanhu_auth.py`
 - `scripts/fetch_lanhu.py`
+- `scripts/inspect_design_system.py`
 - `scripts/restore_lanhu.py`
 
 ## Authentication Rules
 
-Treat Lanhu cookies as secrets. Do not print cookies, commit cookies, paste cookies into generated source, or ask the user to provide `LANHU_COOKIE`.
+Treat Lanhu cookies as secrets. Do not print cookies, commit cookies, paste cookies into generated source, or ask the user to paste cookies into chat.
 
 Use the encrypted local cookie store by default:
 
@@ -79,6 +80,14 @@ Use structured output directories. A typical fetch output should contain:
 
 Never use Lanhu CDN URLs in generated app code. Always localize images and adapt local paths/imports to the target framework.
 
+Before implementing into an existing app, inspect the target project's local design system:
+
+```bash
+python <plugin-root>/scripts/inspect_design_system.py --project-root "$TARGET_PROJECT"
+```
+
+Use focused `--query` searches for likely reusable controls, variables, or styles.
+
 ## Error Recovery
 
 On script or API failure:
@@ -97,3 +106,4 @@ On script or API failure:
 - Design target is explicit unless the URL contains `image_id`.
 - Output directory is chosen and separate from app source unless the user requested otherwise.
 - `--download-code` is omitted unless the user explicitly wants official Lanhu generated HTML/CSS.
+- Local design-system docs, reusable components, styles, and tokens have been inspected when implementing into an existing app.

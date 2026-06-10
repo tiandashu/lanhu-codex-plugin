@@ -16,7 +16,6 @@ fetch_lanhu.py - 从蓝湖获取设计稿数据
 Cookie 来源（优先级由高到低）:
     1. --cookie 参数
     2. scripts/lanhu_auth.py 加密保存的本地 Cookie
-    3. LANHU_COOKIE 环境变量（兼容旧用法，不推荐）
 """
 
 import argparse
@@ -24,7 +23,6 @@ import asyncio
 import json
 import math
 import io
-import os
 import re
 import sys
 import zipfile
@@ -38,12 +36,6 @@ if sys.stderr.encoding and sys.stderr.encoding.lower() != "utf-8":
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 import httpx
-
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
 
 try:
     from lanhu_auth import load_cookie_header
@@ -61,8 +53,9 @@ def parse_lanhu_url(url: str) -> dict:
     """
     解析蓝湖 URL，支持多种格式：
     1. 完整 URL: https://lanhuapp.com/web/#/item/project/stage?tid=...&pid=...
-    2. 参数部分: ?tid=...&pid=...
-    3. 纯参数: tid=...&pid=...
+    2. 单稿 URL: https://lanhuapp.com/web/#/item/project/detailDetach?pid=...&project_id=...&image_id=...
+    3. 参数部分: ?tid=...&pid=...
+    4. 纯参数: tid=...&pid=...
     """
     original_url = url
     if url.startswith("http"):
@@ -107,13 +100,21 @@ def normalize_cookie(cookie: str) -> str:
     return cookie
 
 
+def design_arg_matches_target(design_arg: str | None, target: dict) -> bool:
+    if not design_arg:
+        return True
+    value = str(design_arg)
+    if value.isdigit():
+        return int(value) == target.get("index")
+    return value in {str(target.get("id")), str(target.get("name"))}
+
+
 def describe_auth_failure(resp: httpx.Response, endpoint_name: str) -> str:
     """Return a concise Lanhu-specific auth diagnostic for failed API responses."""
     body = resp.text[:500].replace("\n", " ")
     hint = (
-        "请确认 LANHU_COOKIE 是浏览器开发者工具 Network 请求里的完整 Cookie 请求头，"
-        "不是单个 JWT/token 字符串。若团队开启 SSO，需要先在浏览器完成 SSO 登录，"
-        "再复制 lanhuapp.com 和 dds.lanhuapp.com 请求使用的完整 Cookie。"
+        "请先用 `python scripts/lanhu_auth.py login --url <LANHU_URL>` 完成登录；"
+        "蓝湖网页接口需要完整浏览器 Cookie 状态，团队 SSO 项目尤其如此。"
     )
     return (
         f"{endpoint_name} failed: HTTP {resp.status_code} {resp.reason_phrase}; "
@@ -139,14 +140,17 @@ def _make_client(cookie: str) -> httpx.AsyncClient:
     return httpx.AsyncClient(timeout=HTTP_TIMEOUT, headers=headers, follow_redirects=True)
 
 
-async def get_design_list(client: httpx.AsyncClient, team_id: str, project_id: str) -> dict:
+async def get_design_list(client: httpx.AsyncClient, team_id: str | None, project_id: str) -> dict:
     """获取项目下所有设计图列表"""
-    url = (
-        f"{BASE_URL}/api/project/images"
-        f"?project_id={project_id}&team_id={team_id}"
-        f"&dds_status=1&position=1&show_cb_src=1"
-    )
-    resp = await client.get(url)
+    params = {
+        "project_id": project_id,
+        "dds_status": 1,
+        "position": 1,
+        "show_cb_src": 1,
+    }
+    if team_id:
+        params["team_id"] = team_id
+    resp = await client.get(f"{BASE_URL}/api/project/images", params=params)
     if resp.status_code >= 400:
         raise RuntimeError(describe_auth_failure(resp, "project/images"))
     data = resp.json()
@@ -178,7 +182,7 @@ async def get_design_list(client: httpx.AsyncClient, team_id: str, project_id: s
 
 
 async def get_version_id(
-    client: httpx.AsyncClient, project_id: str, team_id: str, image_id: str
+    client: httpx.AsyncClient, project_id: str, team_id: str | None, image_id: str
 ) -> str:
     """通过 multi_info API 获取设计图的 latest_version（version_id）"""
     params = {"project_id": project_id, "img_limit": 500, "detach": 1}
@@ -208,7 +212,7 @@ async def get_version_id(
 async def get_design_from_multi_info(
     client: httpx.AsyncClient,
     project_id: str,
-    team_id: str,
+    team_id: str | None,
     image_id: str,
 ) -> tuple[dict, str]:
     """Find one design and its latest version from multi_info without listing all images."""
@@ -423,19 +427,21 @@ def _normalize_version_id(version_obj: dict) -> str | None:
 async def get_sketch_json(
     client: httpx.AsyncClient,
     project_id: str,
-    team_id: str,
+    team_id: str | None,
     image_id: str,
     expected_version_id: str | None = None,
 ) -> dict:
     """获取原始 Sketch JSON（含完整设计标注数据，用于 Design Token 提取）"""
+    params = {
+        "dds_status": 1,
+        "image_id": image_id,
+        "project_id": project_id,
+    }
+    if team_id:
+        params["team_id"] = team_id
     resp = await client.get(
         f"{BASE_URL}/api/project/image",
-        params={
-            "dds_status": 1,
-            "image_id": image_id,
-            "team_id": team_id,
-            "project_id": project_id,
-        },
+        params=params,
     )
     resp.raise_for_status()
     data = resp.json()
@@ -888,7 +894,7 @@ async def run(args):
             Path(args.auth_file) if args.auth_file else None,
             silent=True,
         )
-    cookie = normalize_cookie(args.cookie or saved_cookie or os.getenv("LANHU_COOKIE", ""))
+    cookie = normalize_cookie(args.cookie or saved_cookie)
     if not cookie:
         print(
             "Error: 未找到蓝湖登录 Cookie。请先运行 "
@@ -898,8 +904,8 @@ async def run(args):
         sys.exit(1)
     if "=" not in cookie:
         print(
-            "Warning: 当前 LANHU_COOKIE 看起来像单个 token，而不是完整 Cookie 请求头；"
-            "蓝湖网页接口通常需要完整 Cookie，团队 SSO 项目尤其如此。",
+            "Warning: 当前 Cookie 看起来像单个 token，而不是完整 Cookie 请求头；"
+            "请通过 `scripts/lanhu_auth.py login` 重新保存完整浏览器 Cookie。",
             file=sys.stderr,
         )
 
@@ -917,11 +923,17 @@ async def run(args):
         version_id = None
 
         # 单稿 URL 已带 image_id 时，优先跳过列表接口，直接用 multi_info 定位版本。
-        if params.get("doc_id") and not args.design:
+        # detailDetach 链接常省略 tid，列表接口不一定可用。
+        if params.get("doc_id"):
             image_id = params["doc_id"]
             target, version_id = await get_design_from_multi_info(
                 client, project_id, team_id, image_id
             )
+            if not design_arg_matches_target(args.design, target):
+                raise ValueError(
+                    "--design 与 URL 中的 image_id 指向不同设计；"
+                    "请移除 --design，或传入相同的设计 id/name/index。"
+                )
 
         # —— 列出所有设计图 ——
         if not target:
@@ -1086,7 +1098,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument("--url", required=True, help="蓝湖设计稿 URL（含 tid、pid 参数）")
+    parser.add_argument(
+        "--url",
+        required=True,
+        help="蓝湖设计稿 URL（支持 stage 的 tid/pid，也支持 detailDetach 的 pid/project_id/image_id）",
+    )
     parser.add_argument("--cookie", help="蓝湖 Cookie（调试用，优先于本地加密 Cookie）")
     parser.add_argument("--auth-file", help="自定义 lanhu_auth.py 加密 Cookie 文件路径")
     parser.add_argument(

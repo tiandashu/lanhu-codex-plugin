@@ -15,7 +15,7 @@ import html
 import json
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -76,6 +76,7 @@ class RenderNode:
     group: str = ""
     placeholder: str = ""
     reason: str = ""
+    passive_child: bool = False
 
 
 @dataclass
@@ -86,6 +87,20 @@ class InteractionHint:
     group: str = ""
     placeholder: str = ""
     reason: str = ""
+
+
+@dataclass
+class ComponentCandidate:
+    name: str
+    suggested_component: str
+    reason: str
+    node_type: str
+    bounds: dict[str, Any]
+    child_count: int
+    visible_descendants: int
+    interaction_count: int
+    repeated_count: int
+    text_sample: str
 
 
 BUTTON_KEYWORDS = (
@@ -153,6 +168,12 @@ SELECT_KEYWORDS = (
 TAB_KEYWORDS = ("tab", "tabs", "segmented", "segment", "选项卡", "标签页", "标签", "分段")
 TOGGLE_KEYWORDS = ("switch", "toggle", "checkbox", "radio", "开关", "切换", "复选", "单选")
 LINK_KEYWORDS = ("link", "href", "nav", "menu", "导航", "链接", "查看", "详情", "更多")
+NAV_KEYWORDS = ("nav", "navbar", "navigation", "menu", "sidebar", "breadcrumb", "tabbar", "导航", "菜单", "侧边栏", "面包屑")
+CARD_KEYWORDS = ("card", "item", "cell", "tile", "panel", "list-item", "卡片", "列表项", "条目", "面板")
+FORM_KEYWORDS = ("form", "field", "input", "search", "filter", "表单", "字段", "搜索", "筛选")
+DIALOG_KEYWORDS = ("modal", "dialog", "drawer", "popover", "popup", "overlay", "弹窗", "对话框", "抽屉", "浮层", "弹出")
+CLOSE_KEYWORDS = ("close", "dismiss", "back", "cancel", "关闭", "取消", "返回")
+LIST_KEYWORDS = ("list", "table", "grid", "collection", "列表", "表格", "宫格")
 
 
 def load_json(path: Path) -> Any:
@@ -347,6 +368,55 @@ def has_any_keyword(blob: str, keywords: tuple[str, ...]) -> bool:
     return any(keyword.lower() in lowered for keyword in keywords)
 
 
+def row_dims(node: dict[str, Any]) -> dict[str, Any]:
+    style = node.get("style") or {}
+    dims = node.get("rowDims") or style
+    return {
+        "left": dims.get("left", style.get("left", 0)),
+        "top": dims.get("top", style.get("top", 0)),
+        "width": dims.get("width", style.get("width", 0)),
+        "height": dims.get("height", style.get("height", 0)),
+    }
+
+
+def visible_descendant_count(node: dict[str, Any]) -> int:
+    count = 0
+    for child in node.get("children") or []:
+        if isinstance(child, dict) and is_visible(child):
+            count += 1 + visible_descendant_count(child)
+    return count
+
+
+def interaction_count(node: dict[str, Any], inherited_hint: InteractionHint | None = None) -> int:
+    own_hint = infer_interaction(node)
+    if inherited_hint and node.get("type") in {"lanhutext", "lanhuimage"}:
+        own_hint = None
+    inherited_click = inherit_click_hint(inherited_hint)
+    passive_child = bool(inherited_click and not own_hint)
+    count = 1 if own_hint and not passive_child else 0
+    for child in node.get("children") or []:
+        if isinstance(child, dict) and is_visible(child):
+            count += interaction_count(child, own_hint or inherited_hint)
+    return count
+
+
+def structural_signature(node: dict[str, Any]) -> str:
+    children = [child for child in node.get("children") or [] if isinstance(child, dict) and is_visible(child)]
+    child_types = [str(child.get("type") or "node") for child in children[:8]]
+    text_count = sum(1 for child in children if child.get("type") == "lanhutext")
+    image_count = sum(1 for child in children if child.get("type") == "lanhuimage")
+    control_count = sum(1 for child in children if infer_interaction(child))
+    return "|".join(
+        [
+            str(node.get("type") or "node"),
+            ",".join(child_types),
+            f"t{text_count}",
+            f"i{image_count}",
+            f"c{control_count}",
+        ]
+    )
+
+
 def control_label(node: dict[str, Any], fallback: str) -> str:
     text = collect_text(node) or raw_text_value(node)
     name = node.get("eleName") or (node.get("props") or {}).get("name")
@@ -364,6 +434,15 @@ def infer_interaction(node: dict[str, Any]) -> InteractionHint | None:
     node_type = str(node.get("type") or "").lower()
     blob = node_blob(node)
     label = control_label(node, node_type or "Lanhu control")
+
+    if has_any_keyword(blob, DIALOG_KEYWORDS):
+        return InteractionHint(
+            role="dialog",
+            action="dialog",
+            label=label,
+            group=interaction_group(node, "dialog"),
+            reason="dialog/drawer/popover-like layer name or text",
+        )
 
     if node_type in {"lanhuinput", "input", "textarea"} or has_any_keyword(blob, INPUT_KEYWORDS):
         return InteractionHint(
@@ -402,12 +481,22 @@ def infer_interaction(node: dict[str, Any]) -> InteractionHint | None:
             reason="toggle/checkbox/radio-like layer name or text",
         )
 
-    if node_type in {"lanhulink", "link"} or has_any_keyword(blob, LINK_KEYWORDS):
+    if node_type in {"lanhulink", "link"} or (
+        has_any_keyword(blob, LINK_KEYWORDS) and not has_any_keyword(blob, NAV_KEYWORDS)
+    ):
         return InteractionHint(
             role="link",
             action="link",
             label=label,
             reason="link/navigation-like layer name or text",
+        )
+
+    if has_any_keyword(blob, CLOSE_KEYWORDS):
+        return InteractionHint(
+            role="button",
+            action="dismiss",
+            label=label,
+            reason="close/back/cancel affordance",
         )
 
     if node_type in {"lanhubutton", "button"} or has_any_keyword(blob, BUTTON_KEYWORDS):
@@ -422,7 +511,7 @@ def infer_interaction(node: dict[str, Any]) -> InteractionHint | None:
 
 
 def inherit_click_hint(parent: InteractionHint | None) -> InteractionHint | None:
-    if not parent or parent.action not in {"button", "link", "tab", "toggle", "radio", "select"}:
+    if not parent or parent.action not in {"button", "link", "tab", "toggle", "radio", "select", "dismiss"}:
         return None
     return InteractionHint(
         role=parent.role,
@@ -443,7 +532,11 @@ def collect_render_nodes(schema: dict[str, Any]) -> list[RenderNode]:
             return
         node_type = node.get("type", "node")
         own_hint = infer_interaction(node)
-        hint = own_hint or inherit_click_hint(inherited_hint)
+        if inherited_hint and node_type in {"lanhutext", "lanhuimage"}:
+            own_hint = None
+        inherited_click = inherit_click_hint(inherited_hint)
+        hint = own_hint or inherited_click
+        passive_child = bool(inherited_click and not own_hint)
         if has_visible_paint(node):
             base = slugify(node.get("eleName") or node.get("id") or node_type, node_type)
             counts[base] = counts.get(base, 0) + 1
@@ -462,7 +555,7 @@ def collect_render_nodes(schema: dict[str, Any]) -> list[RenderNode]:
                     tag = "input"
                 elif own_hint.role == "link":
                     tag = "a"
-                elif own_hint.action in {"button", "tab", "toggle", "radio", "select"}:
+                elif own_hint.action in {"button", "tab", "toggle", "radio", "select", "dialog", "dismiss"}:
                     tag = "button"
             nodes.append(
                 RenderNode(
@@ -477,6 +570,7 @@ def collect_render_nodes(schema: dict[str, Any]) -> list[RenderNode]:
                     group=hint.group if hint else "",
                     placeholder=hint.placeholder if hint else "",
                     reason=hint.reason if hint else "",
+                    passive_child=passive_child,
                 )
             )
         for child in node.get("children") or []:
@@ -487,6 +581,158 @@ def collect_render_nodes(schema: dict[str, Any]) -> list[RenderNode]:
     return nodes
 
 
+def interaction_expected_behavior(action: str, role: str) -> str:
+    expectations = {
+        "button": "Trigger a visible command, navigation, submit, or local state change.",
+        "link": "Navigate to the intended route or open the referenced detail surface.",
+        "input": "Accept keyboard input, expose value changes, and preserve focus feedback.",
+        "tab": "Switch selected state within its group and reveal the matching content panel.",
+        "toggle": "Toggle checked/on state with visible selected feedback.",
+        "radio": "Select one option within its group and clear sibling options.",
+        "select": "Open and close an option list or picker, then commit a selected value.",
+        "dialog": "Open or focus the related dialog, drawer, popover, or overlay.",
+        "dismiss": "Close the nearest dialog, drawer, popover, or navigate back when appropriate.",
+    }
+    return expectations.get(action) or f"Implement visible behavior for the inferred {role or action} control."
+
+
+def interaction_state_attrs(action: str) -> list[str]:
+    if action in {"toggle", "radio"}:
+        return ["aria-checked", "aria-pressed", "data-lanhu-checked", "data-lanhu-active"]
+    if action == "tab":
+        return ["aria-selected", "data-lanhu-active"]
+    if action in {"select", "dialog"}:
+        return ["aria-expanded", "data-lanhu-open"]
+    if action == "input":
+        return ["value", "focus-visible"]
+    return ["data-lanhu-active"]
+
+
+def interaction_contracts(render_nodes: list[RenderNode]) -> list[dict[str, Any]]:
+    contracts: list[dict[str, Any]] = []
+    for item in render_nodes:
+        if not item.action or item.passive_child:
+            continue
+        node = item.node
+        contracts.append(
+            {
+                "node_id": node.get("id", ""),
+                "layer_name": node.get("eleName", ""),
+                "class_name": item.class_name,
+                "role": item.role,
+                "action": item.action,
+                "label": item.label,
+                "group": item.group,
+                "bounds": row_dims(node),
+                "reason": item.reason,
+                "expected_behavior": interaction_expected_behavior(item.action, item.role),
+                "required_state_attrs": interaction_state_attrs(item.action),
+                "implementation_note": (
+                    "Use an existing project/design-system control when it can preserve Lanhu size, "
+                    "style, keyboard access, and visible state feedback."
+                ),
+            }
+        )
+    return contracts
+
+
+def pascal_name(value: str, fallback: str) -> str:
+    value = html.unescape(value or "")
+    words = re.split(r"[^0-9A-Za-z\u4e00-\u9fff]+", value)
+    ascii_words = [word for word in words if re.search(r"[A-Za-z0-9]", word)]
+    if ascii_words:
+        name = "".join(word[:1].upper() + word[1:] for word in ascii_words)
+    else:
+        name = fallback
+    if not re.match(r"[A-Z]", name):
+        name = fallback + name[:1].upper() + name[1:]
+    return name[:48] or fallback
+
+
+def component_kind(node: dict[str, Any], interactions: int, visible_children: int, repeated: int) -> tuple[str, str]:
+    blob = node_blob(node)
+    if has_any_keyword(blob, NAV_KEYWORDS):
+        return "Navigation", "navigation/menu naming"
+    if has_any_keyword(blob, DIALOG_KEYWORDS):
+        return "Dialog", "dialog/drawer/popover naming"
+    if has_any_keyword(blob, FORM_KEYWORDS) or interactions >= 2:
+        return "FormSection", "multiple controls or form/search naming"
+    if has_any_keyword(blob, LIST_KEYWORDS) and visible_children >= 4:
+        return "ListSection", "list/table/grid naming"
+    if has_any_keyword(blob, CARD_KEYWORDS) or repeated >= 2:
+        return "CardItem", "card/list-item naming or repeated structure"
+    if has_any_keyword(blob, TAB_KEYWORDS):
+        return "Tabs", "tab/segmented naming"
+    if visible_children >= 8:
+        return "Section", "large visible child group"
+    return "Component", "semantic group"
+
+
+def component_candidates(schema: dict[str, Any]) -> list[dict[str, Any]]:
+    signatures: dict[str, int] = {}
+
+    def count_signatures(node: dict[str, Any]) -> None:
+        if not is_visible(node):
+            return
+        signatures[structural_signature(node)] = signatures.get(structural_signature(node), 0) + 1
+        for child in node.get("children") or []:
+            if isinstance(child, dict):
+                count_signatures(child)
+
+    count_signatures(schema)
+
+    candidates: list[tuple[int, ComponentCandidate]] = []
+
+    def walk(node: dict[str, Any]) -> None:
+        if not is_visible(node):
+            return
+        children = [child for child in node.get("children") or [] if isinstance(child, dict) and is_visible(child)]
+        child_count = len(children)
+        descendants = visible_descendant_count(node)
+        interactions = interaction_count(node)
+        repeated = signatures.get(structural_signature(node), 0)
+        blob = node_blob(node)
+        semantic = any(
+            has_any_keyword(blob, keywords)
+            for keywords in (NAV_KEYWORDS, CARD_KEYWORDS, FORM_KEYWORDS, DIALOG_KEYWORDS, LIST_KEYWORDS, TAB_KEYWORDS)
+        )
+        should_extract = (
+            child_count >= 3
+            and (
+                descendants >= 5
+                or interactions >= 1
+                or repeated >= 2
+                or semantic
+            )
+        )
+        if should_extract:
+            kind, reason = component_kind(node, interactions, descendants, repeated)
+            raw_name = str(node.get("eleName") or collect_text(node, 40) or kind)
+            candidate = ComponentCandidate(
+                name=raw_name[:80],
+                suggested_component=pascal_name(raw_name, kind),
+                reason=reason,
+                node_type=str(node.get("type") or ""),
+                bounds=row_dims(node),
+                child_count=child_count,
+                visible_descendants=descendants,
+                interaction_count=interactions,
+                repeated_count=repeated,
+                text_sample=collect_text(node, 120),
+            )
+            score = descendants + interactions * 5 + repeated * 3 + (4 if semantic else 0)
+            candidates.append((score, candidate))
+        for child in children:
+            walk(child)
+
+    for child in schema.get("children") or []:
+        if isinstance(child, dict):
+            walk(child)
+
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    return [asdict(candidate) for _, candidate in candidates[:40]]
+
+
 def css_block(selector: str, rules: list[tuple[str, str]]) -> str:
     body = "\n".join(f"  {key}: {value};" for key, value in rules if value != "")
     return f"{selector} {{\n{body}\n}}"
@@ -494,7 +740,7 @@ def css_block(selector: str, rules: list[tuple[str, str]]) -> str:
 
 def html_attrs(item: RenderNode) -> str:
     attrs: list[tuple[str, str | None]] = []
-    if item.action:
+    if item.action and not item.passive_child:
         attrs.extend(
             [
                 ("data-lanhu-action", item.action),
@@ -516,6 +762,9 @@ def html_attrs(item: RenderNode) -> str:
             attrs.append(("aria-selected", "false"))
         elif item.action == "select":
             attrs.append(("aria-expanded", "false"))
+        elif item.action == "dialog":
+            attrs.append(("aria-expanded", "false"))
+            attrs.append(("aria-haspopup", "dialog"))
         if item.label and item.tag != "input":
             attrs.append(("aria-label", item.label))
     if item.tag == "a":
@@ -670,6 +919,27 @@ def interaction_script() -> str:
       return;
     }
 
+    if (action === "dialog") {
+      const open = target.dataset.lanhuOpen !== "true";
+      setOpen(target, open);
+      show(`${label}${open ? "已打开" : "已收起"}`);
+      page.dataset.lastInteraction = `dialog:${label}:${open}`;
+      return;
+    }
+
+    if (action === "dismiss") {
+      target.dataset.lanhuActive = "true";
+      document.querySelectorAll('[data-lanhu-action="dialog"][data-lanhu-open="true"]').forEach((item) => {
+        setOpen(item, false);
+      });
+      window.setTimeout(() => {
+        target.dataset.lanhuActive = "false";
+      }, 180);
+      show(`已关闭：${label}`);
+      page.dataset.lastInteraction = `dismiss:${label}`;
+      return;
+    }
+
     target.dataset.lanhuActive = "true";
     window.setTimeout(() => {
       target.dataset.lanhuActive = "false";
@@ -743,7 +1013,7 @@ def generate_html(
     for item in render_nodes:
         rules = style_to_css(item.node, remote_to_local)
         css_blocks.append(css_block(f".{item.class_name}", rules))
-        interactive_class = " lanhu-interactive" if include_interactions and item.action else ""
+        interactive_class = " lanhu-interactive" if include_interactions and item.action and not item.passive_child else ""
         hit_class = " lanhu-hit-area" if use_preview_visual else ""
         attrs = html_attrs(item) if include_interactions else ""
         if item.tag == "span":
@@ -766,10 +1036,12 @@ def generate_html(
     design_type = schema.get("designType", "")
     width = (schema.get("rowDims") or schema.get("style") or {}).get("width")
     height = (schema.get("rowDims") or schema.get("style") or {}).get("height")
-    interactive_nodes = [node for node in render_nodes if node.action]
+    interactive_nodes = [node for node in render_nodes if node.action and not node.passive_child]
     role_counts: dict[str, int] = {}
     for node in interactive_nodes:
         role_counts[node.role or node.action] = role_counts.get(node.role or node.action, 0) + 1
+    contracts = interaction_contracts(render_nodes)
+    candidates = component_candidates(schema)
 
     document = f"""<!doctype html>
 <html lang="zh-CN">
@@ -800,6 +1072,9 @@ def generate_html(
         "image_nodes": sum(1 for n in render_nodes if n.node.get("type") == "lanhuimage"),
         "interaction_nodes": len(interactive_nodes),
         "interaction_roles": role_counts,
+        "interaction_contracts": contracts,
+        "component_candidates": candidates,
+        "component_strategy": "semantic-boundaries-repeated-structures-interactive-groups",
         "interaction_strategy": "semantic-heuristics-native-controls-event-delegation"
         if include_interactions
         else "disabled",
@@ -874,7 +1149,7 @@ def main() -> None:
     parser.add_argument(
         "--no-interactions",
         action="store_true",
-        help="Generate the old static-only baseline without inferred controls or interaction script",
+        help="Generate a static baseline without inferred controls or interaction script",
     )
     args = parser.parse_args()
 

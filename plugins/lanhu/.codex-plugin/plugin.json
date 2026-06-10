@@ -14,6 +14,8 @@
     "design-to-code",
     "ui-implementation",
     "interaction-parity",
+    "design-system",
+    "component-search",
     "pixel-perfect",
     "schema"
   ],
@@ -21,7 +23,7 @@
   "interface": {
     "displayName": "Lanhu",
     "shortDescription": "Restore Lanhu designs into production UI code",
-    "longDescription": "Fetches Lanhu schema data, design tokens, preview images, and local image assets, then guides Codex through schema-first UI implementation with visual and interaction parity checks.",
+    "longDescription": "Fetches Lanhu schema data, design tokens, preview images, and local image assets, inspects local design-system components and variables, then guides Codex through schema-first UI implementation with visual and interaction parity checks.",
     "developerName": "tiandashu",
     "category": "Design",
     "capabilities": [
@@ -35,6 +37,7 @@
     "defaultPrompt": [
       "Restore this Lanhu design into my app",
       "Fetch Lanhu schema and assets",
+      "Search my local design system for Lanhu implementation candidates",
       "Implement a Lanhu screen with visual and interaction parity checks"
     ],
     "brandColor": "#1677FF",

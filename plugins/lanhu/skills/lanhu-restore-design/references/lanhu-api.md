@@ -13,23 +13,29 @@ https://lanhuapp.com/web/#/item/project/stage?tid=<team_id>&pid=<project_id>
 Single detached design URL:
 
 ```text
-https://lanhuapp.com/web/#/item/project/detailDetach?tid=<team_id>&pid=<project_id>&project_id=<project_id>&image_id=<image_id>&fromEditor=true&type=image
+https://lanhuapp.com/web/#/item/project/detailDetach?pid=<project_id>&project_id=<project_id>&image_id=<image_id>&fromEditor=true
 ```
 
 Important parameters:
 
-- `tid`: Lanhu team id
+- `tid`: Lanhu team id, optional on some `detailDetach` links
 - `pid` or `project_id`: project id
 - `image_id`: design image id for a single design URL
 - `docId`: alternate design image id used by some Lanhu routes
 
-Some `detailDetach` URLs omit `tid`. In that case, fetch the target by `project_id` and `image_id`; do not reject the URL before trying `project/multi_info`.
+Some `detailDetach` URLs omit `tid`, for example:
+
+```text
+https://lanhuapp.com/web/#/item/project/detailDetach?pid=04d3f972-20e3-4172-aef4-a32ff96b33bf&project_id=04d3f972-20e3-4172-aef4-a32ff96b33bf&image_id=5c6ce78a-a5d5-4317-8bb2-ba7161954816&fromEditor=true
+```
+
+In that case, fetch the target by `project_id` and `image_id`; do not reject the URL before trying `project/multi_info`.
 
 ## Authentication
 
 Lanhu web APIs require the full browser Cookie state. A standalone JWT/token string is not enough for SSO-protected teams.
 
-The plugin should not ask users to configure `LANHU_COOKIE`. Use the local login helper instead:
+The plugin should not ask users to paste or configure cookies in chat. Use the local login helper instead:
 
 ```bash
 python scripts/lanhu_auth.py login --url "<LANHU_URL>"
