@@ -165,15 +165,44 @@ SELECT_KEYWORDS = (
     "排序",
 )
 
-TAB_KEYWORDS = ("tab", "tabs", "segmented", "segment", "选项卡", "标签页", "标签", "分段")
+TAB_KEYWORDS = ("tab", "tabs", "segmented", "segment", "选项卡", "标签页", "分段")
 TOGGLE_KEYWORDS = ("switch", "toggle", "checkbox", "radio", "开关", "切换", "复选", "单选")
 LINK_KEYWORDS = ("link", "href", "nav", "menu", "导航", "链接", "查看", "详情", "更多")
-NAV_KEYWORDS = ("nav", "navbar", "navigation", "menu", "sidebar", "breadcrumb", "tabbar", "导航", "菜单", "侧边栏", "面包屑")
+NAV_KEYWORDS = (
+    "nav",
+    "navbar",
+    "navigation",
+    "menu",
+    "sidebar",
+    "breadcrumb",
+    "tabbar",
+    "首页",
+    "导航",
+    "菜单",
+    "侧边栏",
+    "面包屑",
+)
 CARD_KEYWORDS = ("card", "item", "cell", "tile", "panel", "list-item", "卡片", "列表项", "条目", "面板")
 FORM_KEYWORDS = ("form", "field", "input", "search", "filter", "表单", "字段", "搜索", "筛选")
 DIALOG_KEYWORDS = ("modal", "dialog", "drawer", "popover", "popup", "overlay", "弹窗", "对话框", "抽屉", "浮层", "弹出")
 CLOSE_KEYWORDS = ("close", "dismiss", "back", "cancel", "关闭", "取消", "返回")
 LIST_KEYWORDS = ("list", "table", "grid", "collection", "列表", "表格", "宫格")
+ACTION_BUTTON_TEXTS = (
+    "预览",
+    "复制",
+    "搜索",
+    "重置",
+    "新增",
+    "新建",
+    "创建",
+    "导出",
+    "导入",
+    "编辑",
+    "删除",
+    "发布",
+    "下架",
+)
+SEGMENTED_OPTION_TEXTS = ("集团", "本校", "全国", "全部")
 
 
 def load_json(path: Path) -> Any:
@@ -364,8 +393,20 @@ def node_blob(node: dict[str, Any]) -> str:
 
 
 def has_any_keyword(blob: str, keywords: tuple[str, ...]) -> bool:
-    lowered = blob.lower()
-    return any(keyword.lower() in lowered for keyword in keywords)
+    return any(keyword_in_blob(blob, keyword) for keyword in keywords)
+
+
+def keyword_in_blob(blob: str, keyword: str) -> bool:
+    if re.search(r"[\u4e00-\u9fff]", keyword):
+        return keyword in blob
+    if not re.search(r"[A-Za-z0-9]", keyword):
+        return keyword.lower() in blob.lower()
+    pattern = rf"(?<![a-z0-9]){re.escape(keyword.lower())}(?![a-z0-9])"
+    return re.search(pattern, blob.lower()) is not None
+
+
+def label_matches(label: str, values: tuple[str, ...]) -> bool:
+    return html.unescape(label or "").strip() in values
 
 
 def row_dims(node: dict[str, Any]) -> dict[str, Any]:
@@ -377,6 +418,18 @@ def row_dims(node: dict[str, Any]) -> dict[str, Any]:
         "width": dims.get("width", style.get("width", 0)),
         "height": dims.get("height", style.get("height", 0)),
     }
+
+
+def bounds_area(node: dict[str, Any]) -> float:
+    dims = row_dims(node)
+    return float(dims.get("width") or 0) * float(dims.get("height") or 0)
+
+
+def is_control_sized(node: dict[str, Any]) -> bool:
+    dims = row_dims(node)
+    width = float(dims.get("width") or 0)
+    height = float(dims.get("height") or 0)
+    return 12 <= height <= 72 and 16 <= width <= 520
 
 
 def visible_descendant_count(node: dict[str, Any]) -> int:
@@ -434,8 +487,9 @@ def infer_interaction(node: dict[str, Any]) -> InteractionHint | None:
     node_type = str(node.get("type") or "").lower()
     blob = node_blob(node)
     label = control_label(node, node_type or "Lanhu control")
+    control_sized = is_control_sized(node)
 
-    if has_any_keyword(blob, DIALOG_KEYWORDS):
+    if has_any_keyword(blob, DIALOG_KEYWORDS) and bounds_area(node) >= 1200:
         return InteractionHint(
             role="dialog",
             action="dialog",
@@ -444,7 +498,30 @@ def infer_interaction(node: dict[str, Any]) -> InteractionHint | None:
             reason="dialog/drawer/popover-like layer name or text",
         )
 
-    if node_type in {"lanhuinput", "input", "textarea"} or has_any_keyword(blob, INPUT_KEYWORDS):
+    if label_matches(label, ACTION_BUTTON_TEXTS) and control_sized:
+        return InteractionHint(
+            role="button",
+            action="button",
+            label=label,
+            reason="explicit action text",
+        )
+
+    dims = row_dims(node)
+    if (
+        label_matches(label, SEGMENTED_OPTION_TEXTS)
+        and control_sized
+        and float(dims.get("width") or 0) >= 48
+        and float(dims.get("height") or 0) >= 28
+    ):
+        return InteractionHint(
+            role="radio",
+            action="radio",
+            label=label,
+            group=interaction_group(node, "segmented"),
+            reason="segmented option text",
+        )
+
+    if (node_type in {"lanhuinput", "input", "textarea"} or has_any_keyword(blob, INPUT_KEYWORDS)) and control_sized:
         return InteractionHint(
             role="textbox",
             action="input",
@@ -453,7 +530,7 @@ def infer_interaction(node: dict[str, Any]) -> InteractionHint | None:
             reason="input-like layer name, type, or placeholder text",
         )
 
-    if node_type in {"lanhuselect", "select"} or has_any_keyword(blob, SELECT_KEYWORDS):
+    if (node_type in {"lanhuselect", "select"} or has_any_keyword(blob, SELECT_KEYWORDS)) and control_sized:
         return InteractionHint(
             role="combobox",
             action="select",
@@ -462,7 +539,7 @@ def infer_interaction(node: dict[str, Any]) -> InteractionHint | None:
             reason="select/dropdown-like layer name or text",
         )
 
-    if node_type in {"lanhutab", "tab"} or has_any_keyword(blob, TAB_KEYWORDS):
+    if (node_type in {"lanhutab", "tab"} or has_any_keyword(blob, TAB_KEYWORDS)) and control_sized:
         return InteractionHint(
             role="tab",
             action="tab",
@@ -471,7 +548,7 @@ def infer_interaction(node: dict[str, Any]) -> InteractionHint | None:
             reason="tab-like layer name or text",
         )
 
-    if node_type in {"lanhuswitch", "switch", "checkbox", "radio"} or has_any_keyword(blob, TOGGLE_KEYWORDS):
+    if (node_type in {"lanhuswitch", "switch", "checkbox", "radio"} or has_any_keyword(blob, TOGGLE_KEYWORDS)) and control_sized:
         action = "radio" if "radio" in blob.lower() or "单选" in blob else "toggle"
         return InteractionHint(
             role="radio" if action == "radio" else "switch",
@@ -481,9 +558,9 @@ def infer_interaction(node: dict[str, Any]) -> InteractionHint | None:
             reason="toggle/checkbox/radio-like layer name or text",
         )
 
-    if node_type in {"lanhulink", "link"} or (
+    if control_sized and (node_type in {"lanhulink", "link"} or (
         has_any_keyword(blob, LINK_KEYWORDS) and not has_any_keyword(blob, NAV_KEYWORDS)
-    ):
+    )):
         return InteractionHint(
             role="link",
             action="link",
@@ -491,7 +568,7 @@ def infer_interaction(node: dict[str, Any]) -> InteractionHint | None:
             reason="link/navigation-like layer name or text",
         )
 
-    if has_any_keyword(blob, CLOSE_KEYWORDS):
+    if has_any_keyword(blob, CLOSE_KEYWORDS) and control_sized:
         return InteractionHint(
             role="button",
             action="dismiss",
@@ -499,7 +576,7 @@ def infer_interaction(node: dict[str, Any]) -> InteractionHint | None:
             reason="close/back/cancel affordance",
         )
 
-    if node_type in {"lanhubutton", "button"} or has_any_keyword(blob, BUTTON_KEYWORDS):
+    if (node_type in {"lanhubutton", "button"} or has_any_keyword(blob, BUTTON_KEYWORDS)) and control_sized:
         return InteractionHint(
             role="button",
             action="button",
@@ -651,18 +728,28 @@ def pascal_name(value: str, fallback: str) -> str:
 
 def component_kind(node: dict[str, Any], interactions: int, visible_children: int, repeated: int) -> tuple[str, str]:
     blob = node_blob(node)
+    dims = row_dims(node)
+    height = float(dims.get("height") or 0)
     if has_any_keyword(blob, NAV_KEYWORDS):
         return "Navigation", "navigation/menu naming"
     if has_any_keyword(blob, DIALOG_KEYWORDS):
         return "Dialog", "dialog/drawer/popover naming"
-    if has_any_keyword(blob, FORM_KEYWORDS) or interactions >= 2:
-        return "FormSection", "multiple controls or form/search naming"
-    if has_any_keyword(blob, LIST_KEYWORDS) and visible_children >= 4:
-        return "ListSection", "list/table/grid naming"
-    if has_any_keyword(blob, CARD_KEYWORDS) or repeated >= 2:
-        return "CardItem", "card/list-item naming or repeated structure"
+    if has_any_keyword(blob, CARD_KEYWORDS) and visible_children >= 3:
+        return "CardGrid" if visible_children >= 4 and interactions >= 4 else "CardItem", "card naming"
+    if has_any_keyword(blob, FORM_KEYWORDS):
+        return "FormRow" if height <= 72 and visible_children >= 3 else "FormSection", "multiple controls or form/search naming"
     if has_any_keyword(blob, TAB_KEYWORDS):
         return "Tabs", "tab/segmented naming"
+    if has_any_keyword(blob, LIST_KEYWORDS) and visible_children >= 4:
+        return "ListSection", "list/table/grid naming"
+    if interactions >= 2 and height <= 72 and visible_children >= 3:
+        return "FormRow", "compact interactive control row"
+    if interactions >= 2 and visible_children >= 3:
+        return "CardGrid" if visible_children >= 4 or visible_descendant_count(node) >= 30 else "CardItem", "interactive repeated content group"
+    if repeated >= 2 and visible_children >= 3:
+        return "CardGrid", "repeated interactive card structure"
+    if repeated >= 2:
+        return "CardItem", "card/list-item naming or repeated structure"
     if visible_children >= 8:
         return "Section", "large visible child group"
     return "Component", "semantic group"
@@ -681,7 +768,7 @@ def component_candidates(schema: dict[str, Any]) -> list[dict[str, Any]]:
 
     count_signatures(schema)
 
-    candidates: list[tuple[int, ComponentCandidate]] = []
+    candidates: dict[tuple[str, str], tuple[int, ComponentCandidate]] = {}
 
     def walk(node: dict[str, Any]) -> None:
         if not is_visible(node):
@@ -691,17 +778,20 @@ def component_candidates(schema: dict[str, Any]) -> list[dict[str, Any]]:
         descendants = visible_descendant_count(node)
         interactions = interaction_count(node)
         repeated = signatures.get(structural_signature(node), 0)
+        area = bounds_area(node)
         blob = node_blob(node)
         semantic = any(
             has_any_keyword(blob, keywords)
             for keywords in (NAV_KEYWORDS, CARD_KEYWORDS, FORM_KEYWORDS, DIALOG_KEYWORDS, LIST_KEYWORDS, TAB_KEYWORDS)
         )
+        meaningful_boundary = area >= 2400 and descendants >= 5
+        repeated_boundary = repeated >= 2 and area >= 3200 and descendants >= 8
         should_extract = (
             child_count >= 3
+            and meaningful_boundary
             and (
-                descendants >= 5
-                or interactions >= 1
-                or repeated >= 2
+                interactions >= 1
+                or repeated_boundary
                 or semantic
             )
         )
@@ -721,7 +811,10 @@ def component_candidates(schema: dict[str, Any]) -> list[dict[str, Any]]:
                 text_sample=collect_text(node, 120),
             )
             score = descendants + interactions * 5 + repeated * 3 + (4 if semantic else 0)
-            candidates.append((score, candidate))
+            key = (kind, structural_signature(node))
+            existing = candidates.get(key)
+            if existing is None or score > existing[0]:
+                candidates[key] = (score, candidate)
         for child in children:
             walk(child)
 
@@ -729,8 +822,8 @@ def component_candidates(schema: dict[str, Any]) -> list[dict[str, Any]]:
         if isinstance(child, dict):
             walk(child)
 
-    candidates.sort(key=lambda item: item[0], reverse=True)
-    return [asdict(candidate) for _, candidate in candidates[:40]]
+    ranked = sorted(candidates.values(), key=lambda item: item[0], reverse=True)
+    return [asdict(candidate) for _, candidate in ranked[:40]]
 
 
 def css_block(selector: str, rules: list[tuple[str, str]]) -> str:
