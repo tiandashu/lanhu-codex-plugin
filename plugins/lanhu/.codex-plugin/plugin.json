@@ -1,6 +1,6 @@
 {
   "name": "lanhu",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Lanhu design-to-code workflows for fetching design schema, localizing assets, and restoring screens into project code.",
   "author": {
     "name": "tiandashu",
